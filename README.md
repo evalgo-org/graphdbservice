@@ -15,3 +15,7 @@ poetry run python app.py [option]
 - export_import_repos_c5_ke1
 
 
+## deployments
+````
+poetry run prefect deploy --all
+````
