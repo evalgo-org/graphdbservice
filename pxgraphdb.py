@@ -1,0 +1,247 @@
+from prefect import flow, task
+from os import environ
+
+from pxinfra.pxdocker import PXDocker
+from pxinfra import pxbackup
+from pxinfra import pxrestore
+from pxinfra import pxexport
+from pxinfra import pximport
+from pxinfra.pxinfisical import PXInfisical
+
+PX_GRAPHDB_NETWORK='env-px'
+PX_GRAPHDB_VOLUME='env-px-graphdb-data'
+PX_GRAPHDB_IMAGE='ontotext/graphdb'
+PX_GRAPHDB_VERSION='10.6.3'
+
+@task(log_prints=True)
+def default(name: str):
+    pxd = PXDocker(environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST'))
+    gdb_pull = pxd.image_pull(PX_GRAPHDB_IMAGE, PX_GRAPHDB_VERSION)
+    # todo: check the pull result
+    gdb_vol = pxd.volume_create(name+'-data', 'local')
+    # todo: check pg_vol
+    gdb_nw = pxd.network_create(PX_GRAPHDB_NETWORK, 'bridge')
+    # todo: check pg_nw
+    mounts = [pxd.mount_create(name+'-data','/opt/graphdb/home')]
+    # todo: check mounts
+    container = pxd.container_run(':'.join([PX_GRAPHDB_IMAGE, str(PX_GRAPHDB_VERSION)]), name, gdb_nw['name'], mounts, {})
+    # todo: check container
+    return {
+        'image': ':'.join([PX_GRAPHDB_IMAGE, PX_GRAPHDB_VERSION]),
+        'network': PX_GRAPHDB_NETWORK,
+        'volume': name+'-data',
+        'container': container}
+
+@task(log_prints=True)
+def default_ports(name: str, ports: dict):
+    pxd = PXDocker(environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST'))
+    gdb_pull = pxd.image_pull(PX_GRAPHDB_IMAGE, PX_GRAPHDB_VERSION)
+    # todo: check the pull result
+    gdb_vol = pxd.volume_create(name+'-data', 'local')
+    # todo: check pg_vol
+    gdb_nw = pxd.network_create(PX_GRAPHDB_NETWORK, 'bridge')
+    # todo: check pg_nw
+    mounts = [pxd.mount_create(name+'-data','/opt/graphdb/home')]
+    # todo: check mounts
+    container = pxd.container_run_ports(':'.join([PX_GRAPHDB_IMAGE, str(PX_GRAPHDB_VERSION)]), name, gdb_nw['name'], mounts, ports, {})
+    # todo: check container
+    return {
+        'image': ':'.join([PX_GRAPHDB_IMAGE, PX_GRAPHDB_VERSION]),
+        'network': PX_GRAPHDB_NETWORK,
+        'volume': name+'-data',
+        'container': container,
+        'ports': ports}
+
+@task(log_prints=True)
+def default_remove(name: str):
+    pxd = PXDocker(environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST'))
+    container = pxd.container_by_name(name)
+    stopped = container['container'].stop()
+    # todo: check stopped
+    removed = container['container'].remove()
+    # todo: check removed
+    return removed
+
+@flow(log_prints=True)
+def backup_restore(src_url: str, prefix: str, repos: list[str], src_user:str = '', src_passwd: str = '', tgt_url: str = '', tgt_user: str = '', tgt_passwd: str = ''):
+    bkup = pxbackup.graphdb(src_url, prefix, repos, src_user, src_passwd)
+    if tgt_user != '' and tgt_passwd != '':
+        return pxrestore.graphdb(tgt_url, bkup, username=tgt_user, password=tgt_passwd)
+    return pxrestore.graphdb(tgt_url, bkup)
+
+@flow(log_prints=True)
+def export_import_repos(url: str, prefix: str, repos: list[str], container:str, volume:str, network: str, user:str = '', passwd: str = ''):
+    pxd = PXDocker(environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST'))
+    cnt = pxd.container_by_name(container)
+    resp_repos = list(map(lambda r: pxexport.graphdb_repo(url=url, prefix=prefix, repo=r, user=user, passwd=passwd), repos))
+    cnt['container'].stop()
+    resp_import = list(map(lambda r: pximport.graphdb_repo(volume, network, r['conf'], r['data']), resp_repos))
+    cnt['container'].start()
+    return resp_import
+
+@flow(log_prints=True)
+def export_import_repos_graphs(src_url: str, prefix: str, src_repo: str, graphs: list[str], tgt_url: str, tgt_repo: str, src_user: str = '', src_passwd: str = '', tgt_user: str = '', tgt_passwd: str = ''):
+    resp_graphs = list(map(lambda g: pxexport.graphdb_repo_graph(src_url, prefix, src_repo, g, src_user, src_passwd), graphs))
+    resp = list(map(lambda g: pximport.graphdb_graph(tgt_url, tgt_repo, g['graph'], g['file'], tgt_user, tgt_passwd), resp_graphs))
+    list(map(lambda r: print(r.content, r.headers), resp))
+    return resp
+
+# env-ontotext-graphdb-ke-test @ mercur
+@flow(log_prints=True)
+def backup_restore_c5_ke_test(repos: list[str]):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke-test')
+    config = pxsec.bytes_to_dict(secrets_file)
+    backup_restore(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_c5_ke_test(repos: list[str]):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke-test')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_ke1_ke_test(repos: list[str]):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke1-ke-test')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_ke2_ke_test(repos: list[str]):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke2-ke-test')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_graphs_c5_ke_test(src_repo: str, graphs: list[str], tgt_repo: str):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke-test')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos_graphs(config['BKP_SRV'], config['BKP_PREFIX'], src_repo, graphs, config['RST_SRV'], tgt_repo, config['BKP_USER'], config['BKP_PASS'], config['RST_USER'], config['RST_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_graphs_ke1_ke_test(src_repo: str, graphs: list[str], tgt_repo: str):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke1-ke-test')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos_graphs(config['BKP_SRV'], config['BKP_PREFIX'], src_repo, graphs, config['RST_SRV'], tgt_repo, config['BKP_USER'], config['BKP_PASS'], config['RST_USER'], config['RST_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_graphs_ke2_ke_test(src_repo: str, graphs: list[str], tgt_repo: str):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke2-ke-test')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos_graphs(config['BKP_SRV'], config['BKP_PREFIX'], src_repo, graphs, config['RST_SRV'], tgt_repo, config['BKP_USER'], config['BKP_PASS'], config['RST_USER'], config['RST_PASS'])
+
+# env-ontotext-graphdb-ke-ingest @ mercur
+@flow(log_prints=True)
+def backup_restore_c5_ke_ingest(repos: list[str]):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke-ingest')
+    config = pxsec.bytes_to_dict(secrets_file)
+    backup_restore(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_c5_ke_ingest(repos: list[str]):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke-ingest')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_graphs_c5_ke_ingest(src_repo: str, graphs: list[str], tgt_repo: str):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke-ingest')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos_graphs(config['BKP_SRV'], config['BKP_PREFIX'], src_repo, graphs, config['RST_SRV'], tgt_repo, config['BKP_USER'], config['BKP_PASS'], config['RST_USER'], config['RST_PASS'])
+
+# env-ontotext-graphdb-demo @ mercur
+@flow(log_prints=True)
+def backup_restore_c5_demo(repos: list[str]):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'demo')
+    config = pxsec.bytes_to_dict(secrets_file)
+    backup_restore(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_c5_demo(repos: list[str]):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'demo')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_graphs_c5_demo(src_repo: str, graphs: list[str], tgt_repo: str):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'demo')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos_graphs(config['BKP_SRV'], config['BKP_PREFIX'], src_repo, graphs, config['RST_SRV'], tgt_repo, config['BKP_USER'], config['BKP_PASS'], config['RST_USER'], config['RST_PASS'])
+
+# env-ontotext-graphdb-dev @ build.px
+@flow(log_prints=True)
+def backup_restore_c5_dev(repos: list[str]):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'dev')
+    config = pxsec.bytes_to_dict(secrets_file)
+    backup_restore(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_c5_dev(repos: list[str]):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'dev')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_graphs_c5_dev(src_repo: str, graphs: list[str], tgt_repo: str):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'dev')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos_graphs(config['BKP_SRV'], config['BKP_PREFIX'], src_repo, graphs, config['RST_SRV'], tgt_repo, config['BKP_USER'], config['BKP_PASS'], config['RST_USER'], config['RST_PASS'])
+
+# env-ontotext-graphdb-ke1 @ build.px
+@flow(log_prints=True)
+def backup_restore_c5_ke1(repos: list[str]):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke1')
+    config = pxsec.bytes_to_dict(secrets_file)
+    backup_restore(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_c5_ke1(repos: list[str]):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke1', 'stringify')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_graphs_c5_ke1(src_repo: str, graphs: list[str], tgt_repo: str):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke1')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos_graphs(config['BKP_SRV'], config['BKP_PREFIX'], src_repo, graphs, config['RST_SRV'], tgt_repo, config['BKP_USER'], config['BKP_PASS'], config['RST_USER'], config['RST_PASS'])
+
+# env-ontotext-graphdb-ke2 @ build.px
+@flow(log_prints=True)
+def backup_restore_c5_ke2(repos: list[str]):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke2')
+    config = pxsec.bytes_to_dict(secrets_file)
+    backup_restore(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_c5_ke2(repos: list[str]):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke2')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+
+@flow(log_prints=True)
+def export_import_repos_graphs_c5_ke2(src_repo: str, graphs: list[str], tgt_repo: str):
+    pxsec = PXInfisical()
+    secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke2')
+    config = pxsec.bytes_to_dict(secrets_file)
+    export_import_repos_graphs(config['BKP_SRV'], config['BKP_PREFIX'], src_repo, graphs, config['RST_SRV'], tgt_repo, config['BKP_USER'], config['BKP_PASS'], config['RST_USER'], config['RST_PASS'])

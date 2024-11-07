@@ -1,0 +1,4 @@
+poetry.lock
+*.tar.gz
+*~
+__pycache__

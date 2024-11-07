@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "knowledge-graph"
+version = "0.0.1"
+description = ""
+authors = ["franciscsimon <francisc.simon@pantopix.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pxinfra = "0.0.27"
+
+
+[[tool.poetry.source]]
+name = "pantopix"
+url = "https://cache.hz.pantopix.net/repository/pypi-private/simple/"
+priority = "supplemental"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
