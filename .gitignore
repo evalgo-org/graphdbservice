@@ -2,3 +2,5 @@ poetry.lock
 *.tar.gz
 *~
 __pycache__
+*.env
+.env

@@ -2,6 +2,7 @@
 
 ## usage
 ````
+export PREFECT_API_URL=http://pipelines.px/api
 poetry env use python3.12
 poetry config http-basic.pantopix ${USER} ${SECRET}
 poetry install
