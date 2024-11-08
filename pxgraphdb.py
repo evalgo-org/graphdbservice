@@ -1,5 +1,8 @@
 from prefect import flow, task
 from os import environ
+import requests
+from requests.auth import HTTPBasicAuth
+from jinja2 import Template
 
 from pxinfra.pxdocker import PXDocker
 from pxinfra import pxbackup
@@ -61,6 +64,35 @@ def default_remove(name: str):
     removed = container['container'].remove()
     # todo: check removed
     return removed
+
+@task(log_prints=True)
+def exists_repository(server: str, name: str, username: str = '', password: str = ''):
+    resp = None
+    if username != '' and password != '':
+        basic = HTTPBasicAuth(username, password)
+        resp = requests.get(server, auth=basic)
+    else:
+        resp = requests.get('http://ke1.graphdb.px:7200/rest/repositories')
+    found = list(filter(lambda r: True if r['id'] == name else False, resp.json()))
+    if len(found) > 0:
+        return True
+    return False
+
+@task(log_prints=True)
+def create_repository(server: str, name: str, username: str = '', password: str = ''):
+    if not exists_repository(server, name, username, password):
+        tmpl_content = None
+        tmpl_file = name+'.ttl'
+        with open('new_repository_config.ttl.jinja') as tmpl:
+            tmpl_content = Template(tmpl.read())
+        with open(tmpl_file, 'w') as wtmpl:
+            wtmpl.write(tmpl_content.render(repository_id=name))
+        files = {'config':open(tmpl_file)}
+        if username != '' and password != '':
+            basic = HTTPBasicAuth(username, password)
+            return requests.post(server, files=files, auth=basic)
+        return requests.post(server, files=files)
+    return None
 
 @flow(log_prints=True)
 def backup_restore(src_url: str, prefix: str, repos: list[str], src_user:str = '', src_passwd: str = '', tgt_url: str = '', tgt_user: str = '', tgt_passwd: str = ''):
