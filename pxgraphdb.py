@@ -70,7 +70,7 @@ def exists_repository(server: str, name: str, username: str = '', password: str 
     resp = None
     if username != '' and password != '':
         basic = HTTPBasicAuth(username, password)
-        resp = requests.get(server, auth=basic)
+        resp = requests.get(server+'/rest/repositories', auth=basic)
     else:
         resp = requests.get(server)
     found = list(filter(lambda r: True if r['id'] == name else False, resp.json()))
@@ -91,7 +91,13 @@ def create_repository(server: str, name: str, username: str = '', password: str 
         if username != '' and password != '':
             basic = HTTPBasicAuth(username, password)
             return requests.post(server, files=files, auth=basic)
-        return requests.post(server, files=files)
+        return requests.post(server+'/rest/repositories', files=files)
+    return None
+
+@task(log_prints=True)
+def delete_repository(server: str, name: str, username: str = '', password: str = ''):
+    if exists_repository(server, name, username, password):
+        return requests.delete(server+'/rest/repositories/'+name)
     return None
 
 @flow(log_prints=True)
