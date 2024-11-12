@@ -12,7 +12,7 @@ def export_import_repos_c5_ke1():
     pxgraphdb.export_import_repos_c5_ke1(['Vestas-demo'])
 
 if __name__ == '__main__':
-    pxgraphdb.create_repository('http://ke1.graphdb.px:7200', 'test-from-francisc-2')
+    pxgraphdb.create_repository('http://ke1.graphdb.px:7200', 'test-from-francisc-3')
     # args = sys.argv[1:]
     # if len(args) > 0:
     #     if args[0] == 'export_import_repos_c5_ke1':

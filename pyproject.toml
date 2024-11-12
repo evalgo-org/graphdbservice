@@ -1,16 +1,17 @@
 [tool.poetry]
 name = "knowledge-graph"
-version = "0.0.2"
+version = "0.0.3"
 description = ""
 authors = ["franciscsimon <francisc.simon@pantopix.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-pxinfra = "0.0.27"
+pxinfra = "0.0.30"
 prefect = "^3.1.0"
 requests = "^2.32.3"
 jinja2 = "^3.1.4"
+httpx = "0.27.2"
 
 
 [[tool.poetry.source]]
