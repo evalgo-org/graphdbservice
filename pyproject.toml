@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "knowledge-graph"
+name = "pxknowledge-graph"
 version = "0.0.3"
 description = ""
 authors = ["franciscsimon <francisc.simon@pantopix.com>"]
