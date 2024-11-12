@@ -20,7 +20,7 @@ pull:
     stream_output: true
 - prefect.deployments.steps.git_clone:
     id: clone-step
-    repository: ssh://git@git.pantopix.net:3300/infrastructure/knowledge-graph.git
+    repository: ssh://git@git.pantopix.net:3300/infrastructure/pxknowledge-graph.git
     branch: main
     access_token: '{{ prefect.blocks.secret.deployment-bafa-flow-run-bafa-flow-repo-token}}'
 - prefect.deployments.steps.run_shell_script:
