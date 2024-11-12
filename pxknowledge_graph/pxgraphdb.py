@@ -83,7 +83,7 @@ def create_repository(server: str, name: str, username: str = '', password: str 
     if not exists_repository(server, name, username, password):
         tmpl_content = None
         tmpl_file = name+'.ttl'
-        with open('new_repository_config.ttl.jinja') as tmpl:
+        with open(environ.get('PXKNOWLEDGE_GRAPH_TMPL')+os.path.sep+'new_repository_config.ttl.jinja') as tmpl:
             tmpl_content = Template(tmpl.read())
         with open(tmpl_file, 'w') as wtmpl:
             wtmpl.write(tmpl_content.render(repository_id=name))
