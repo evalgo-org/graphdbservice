@@ -3,7 +3,7 @@ from os import environ
 import sys
 from prefect import flow
 
-import pxgraphdb
+from knowledge_graph import pxgraphdb
 
 load_dotenv()
 

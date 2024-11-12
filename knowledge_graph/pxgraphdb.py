@@ -72,7 +72,7 @@ def exists_repository(server: str, name: str, username: str = '', password: str 
         basic = HTTPBasicAuth(username, password)
         resp = requests.get(server+'/rest/repositories', auth=basic)
     else:
-        resp = requests.get(server)
+        resp = requests.get(server+'/rest/repositories')
     found = list(filter(lambda r: True if r['id'] == name else False, resp.json()))
     if len(found) > 0:
         return True
