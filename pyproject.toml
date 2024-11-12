@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "knowledge-graph"
-version = "0.0.1"
+version = "0.0.2"
 description = ""
 authors = ["franciscsimon <francisc.simon@pantopix.com>"]
 readme = "README.md"
