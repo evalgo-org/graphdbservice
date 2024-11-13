@@ -1,6 +1,7 @@
 from prefect import flow, task
 from os import environ,path
 import requests
+import time
 from requests.auth import HTTPBasicAuth
 from jinja2 import Template
 
@@ -118,10 +119,21 @@ def export_import_repos(url: str, prefix: str, repos: list[str], container:str, 
     return resp_import
 
 @flow(log_prints=True)
+def delayed_graph_export(url: str, prefix: str, repo: str, graph: str, username: str, password:str):
+    time.sleep(5)
+    return pxexport.graphdb_repo_graph(url, prefix, repo, graph, username, password)
+
+@flow(log_prints=True)
+def delayed_graph_import(url: str, repo: str, graph: str, graph_file: str, username: str, password:str):
+    time.sleep(5)
+    return pximport.graphdb_graph(url, repo, graph, graph_file, username, password)
+
+@flow(log_prints=True)
 def export_import_repos_graphs(src_url: str, prefix: str, src_repo: str, graphs: list[str], tgt_url: str, tgt_repo: str, src_user: str = '', src_passwd: str = '', tgt_user: str = '', tgt_passwd: str = ''):
-    resp_graphs = list(map(lambda g: pxexport.graphdb_repo_graph(src_url, prefix, src_repo, g, src_user, src_passwd), graphs))
-    resp = list(map(lambda g: pximport.graphdb_graph(tgt_url, tgt_repo, g['graph'], g['file'], tgt_user, tgt_passwd), resp_graphs))
-    list(map(lambda r: print(r.content, r.headers), resp))
+    resp_graphs = list(map(lambda g: delayed_graph_export(src_url, prefix, src_repo, g, src_user, src_passwd), graphs))
+    list(map(lambda g: print("exported graph", g), resp_graphs))
+    resp = list(map(lambda g: {'graph': g['graph'], 'response': delayed_graph_import(tgt_url, tgt_repo, g['graph'], g['file'], tgt_user, tgt_passwd)}, resp_graphs))
+    list(map(lambda r: print(r['graph'], r['response'].content, r['response'].headers), resp))
     return resp
 
 # env-ontotext-graphdb-ke-test @ mercur
