@@ -128,13 +128,22 @@ def delayed_graph_import(url: str, repo: str, graph: str, graph_file: str, usern
     time.sleep(5)
     return pximport.graphdb_graph(url, repo, graph, graph_file, username, password)
 
+def filter_error_response(resp: dict, export_responses: list[dict]):
+    found_errors = list(filter(lambda graph: True if graph['graph'] == resp['graph'] else False, export_responses))
+    if len(found_errors) > 0:
+        return found_errors[0]
+    return None
+
 @flow(log_prints=True)
 def export_import_repos_graphs(src_url: str, prefix: str, src_repo: str, graphs: list[str], tgt_url: str, tgt_repo: str, src_user: str = '', src_passwd: str = '', tgt_user: str = '', tgt_passwd: str = ''):
-    resp_graphs = list(map(lambda g: delayed_graph_export(src_url, prefix, src_repo, g, src_user, src_passwd), graphs))
+    export_responses = list(map(lambda g: delayed_graph_export(src_url, prefix, src_repo, g, src_user, src_passwd), graphs))
     list(map(lambda g: print("exported graph", g), resp_graphs))
-    resp = list(map(lambda g: {'graph': g['graph'], 'response': delayed_graph_import(tgt_url, tgt_repo, g['graph'], g['file'], tgt_user, tgt_passwd)}, resp_graphs))
-    list(map(lambda r: print(r['graph'], r['response'].content, r['response'].headers), resp))
-    return resp
+    import_responses = list(map(lambda g: {'graph': g['graph'], 'response': delayed_graph_import(tgt_url, tgt_repo, g['graph'], g['file'], tgt_user, tgt_passwd)}, export_responses))
+    # error_responses = list(filter(lambda resp: True if resp['response'].status_code == 400 else False, import_responses))
+    # if len(error_responses) > 0:
+    #     retry_err_responses = list(filter(lambda resp: filter_error_response(resp, export_responses), ))
+    list(map(lambda r: print(r['graph'], r['response'].content, r['response'].headers), import_responses))
+    return import_responses
 
 # env-ontotext-graphdb-ke-test @ mercur
 @flow(log_prints=True)
