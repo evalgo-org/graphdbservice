@@ -137,12 +137,12 @@ def filter_error_response(resp: dict, export_responses: list[dict]):
 @flow(log_prints=True)
 def export_import_repos_graphs(src_url: str, prefix: str, src_repo: str, graphs: list[str], tgt_url: str, tgt_repo: str, src_user: str = '', src_passwd: str = '', tgt_user: str = '', tgt_passwd: str = ''):
     export_responses = list(map(lambda g: delayed_graph_export(src_url, prefix, src_repo, g, src_user, src_passwd), graphs))
-    list(map(lambda g: print("exported graph", g), resp_graphs))
+    list(map(lambda g: print("exported graph", g), export_responses))
     import_responses = list(map(lambda g: {'graph': g['graph'], 'response': delayed_graph_import(tgt_url, tgt_repo, g['graph'], g['file'], tgt_user, tgt_passwd)}, export_responses))
     # error_responses = list(filter(lambda resp: True if resp['response'].status_code == 400 else False, import_responses))
     # if len(error_responses) > 0:
     #     retry_err_responses = list(filter(lambda resp: filter_error_response(resp, export_responses), ))
-    list(map(lambda r: print(r['graph'], r['response'].content, r['response'].headers), import_responses))
+    list(map(lambda r: print(r['graph'], r['response']), import_responses))
     return import_responses
 
 # env-ontotext-graphdb-ke-test @ mercur

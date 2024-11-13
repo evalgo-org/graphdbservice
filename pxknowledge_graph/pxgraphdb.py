@@ -142,7 +142,7 @@ def export_import_repos_graphs(src_url: str, prefix: str, src_repo: str, graphs:
     # error_responses = list(filter(lambda resp: True if resp['response'].status_code == 400 else False, import_responses))
     # if len(error_responses) > 0:
     #     retry_err_responses = list(filter(lambda resp: filter_error_response(resp, export_responses), ))
-    list(map(lambda r: print(r['graph'], r['response'].content, r['response'].headers), import_responses))
+    list(map(lambda r: print(r['graph'], r['response']), import_responses))
     return import_responses
 
 # env-ontotext-graphdb-ke-test @ mercur
