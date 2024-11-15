@@ -137,11 +137,11 @@ def filter_error_response(resp: dict, export_responses: list[dict]):
 @task(log_prints=True)
 def graph_import_with_check(url: str, repo: str, graph: str, graph_file:str, username: str, passwd: str):
     time.sleep(2)
-    imp_resp = pximport.graphdb_graph(url, repo, graph, graph_file, username, password)
+    imp_resp = pximport.graphdb_graph(url, repo, graph, graph_file, username, passwd)
     if not pxexport.graphdb_graph_exists(url, repo, graph, username, passwd):
         print(f"reimport {url}::{repo} graph {graph} from file {graph_file}...")
         time.sleep(2)
-        return pximport.graphdb_graph(url, repo, graph, graph_file, username, password)
+        return pximport.graphdb_graph(url, repo, graph, graph_file, username, passwd)
 
 @flow(log_prints=True)
 def export_import_repos_graphs(src_url: str, prefix: str, src_repo: str, graphs: list[str], tgt_url: str, tgt_repo: str, src_user: str = '', src_passwd: str = '', tgt_user: str = '', tgt_passwd: str = ''):
