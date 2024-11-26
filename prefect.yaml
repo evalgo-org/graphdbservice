@@ -40,7 +40,7 @@ deployments:
   tags: []
   concurrency_limit:
   description:
-  entrypoint: pxgraphdb.py:export_import_repos_c5_ke1
+  entrypoint: pxknowledge_graph/pxgraphdb.py:export_import_repos_c5_ke1
   parameters:
     repos: ['Vestas-demo']
   work_pool:
@@ -54,7 +54,7 @@ deployments:
   tags: []
   concurrency_limit:
   description:
-  entrypoint: pxgraphdb.py:export_import_repos_graphs_c5_ke1
+  entrypoint: pxknowledge_graph/pxgraphdb.py:export_import_repos_graphs_c5_ke1
   parameters:
     src_repo: Consumption-Navigator-001
     graphs: ['https://data.kaeser.com/KKH/GPH']
@@ -70,7 +70,7 @@ deployments:
   tags: []
   concurrency_limit:
   description:
-  entrypoint: pxgraphdb.py:export_import_repos_ke1_ke_test
+  entrypoint: pxknowledge_graph/pxgraphdb.py:export_import_repos_ke1_ke_test
   parameters:
     repos: ['Vestas-demo']
   work_pool:
@@ -84,7 +84,7 @@ deployments:
   tags: []
   concurrency_limit:
   description:
-  entrypoint: pxgraphdb.py:export_import_repos_graphs_ke1_ke_test
+  entrypoint: pxknowledge_graph/pxgraphdb.py:export_import_repos_graphs_ke1_ke_test
   parameters:
     src_repo: Consumption-Navigator-001
     graphs: ['https://data.kaeser.com/KKH/GPH']
@@ -100,7 +100,7 @@ deployments:
   tags: []
   concurrency_limit:
   description:
-  entrypoint: pxgraphdb.py:export_import_repos_c5_ke2
+  entrypoint: pxknowledge_graph/pxgraphdb.py:export_import_repos_c5_ke2
   parameters:
     repos: ['Vestas-demo']
   work_pool:
@@ -114,7 +114,7 @@ deployments:
   tags: []
   concurrency_limit:
   description:
-  entrypoint: pxgraphdb.py:export_import_repos_graphs_c5_ke2
+  entrypoint: pxknowledge_graph/pxgraphdb.py:export_import_repos_graphs_c5_ke2
   parameters:
     src_repo: Consumption-Navigator-001
     graphs: ['https://data.kaeser.com/KKH/GPH']
@@ -130,7 +130,7 @@ deployments:
   tags: []
   concurrency_limit:
   description:
-  entrypoint: pxgraphdb.py:export_import_repos_ke2_ke_test
+  entrypoint: pxknowledge_graph/pxgraphdb.py:export_import_repos_ke2_ke_test
   parameters:
     repos: ['Vestas-demo']
   work_pool:
@@ -144,7 +144,7 @@ deployments:
   tags: []
   concurrency_limit:
   description:
-  entrypoint: pxgraphdb.py:export_import_repos_graphs_ke2_ke_test
+  entrypoint: pxknowledge_graph/pxgraphdb.py:export_import_repos_graphs_ke2_ke_test
   parameters:
     src_repo: Consumption-Navigator-001
     graphs: ['https://data.kaeser.com/KKH/GPH']
