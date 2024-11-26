@@ -116,19 +116,21 @@ def export_import_repos(src_url: str, prefix: str, repos: list[str], src_user: s
     resp_repos = list(map(lambda r: {'repo': r, 'files': px_exp.graphdb_repo(prefix=prefix, repo=r)}, repos))
     cnt['container'].stop()
     px_imp = PXImportGraphDB(tgt_url, tgt_user, tgt_passwd)
-    resp_import = list(map(lambda r: pximport.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['conf']), resp_repos))
+    resp_import = list(map(lambda r: px_imp.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['conf']), resp_repos))
     cnt['container'].start()
     return resp_import
 
 @flow(log_prints=True)
 def delayed_graph_export(url: str, prefix: str, repo: str, graph: str, username: str, password:str):
     time.sleep(5)
-    return pxexport.graphdb_repo_graph(url, prefix, repo, graph, username, password)
+    px_exp = PXExportGraphDB(url, username, password)
+    return px_exp.graphdb_repo_graph(prefix, repo, graph)
 
 @flow(log_prints=True)
 def delayed_graph_import(url: str, repo: str, graph: str, graph_file: str, username: str, password:str):
     time.sleep(5)
-    return pximport.graphdb_graph(url, repo, graph, graph_file, username, password)
+    px_imp = PXImportGraphDB(url, username, password)
+    return px_imp.graphdb_graph(repo, graph, graph_file)
 
 def filter_error_response(resp: dict, export_responses: list[dict]):
     found_errors = list(filter(lambda graph: True if graph['graph'] == resp['graph'] else False, export_responses))
@@ -139,11 +141,13 @@ def filter_error_response(resp: dict, export_responses: list[dict]):
 @task(log_prints=True)
 def graph_import_with_check(url: str, repo: str, graph: str, graph_file:str, username: str, passwd: str):
     time.sleep(2)
-    imp_resp = pximport.graphdb_graph(url, repo, graph, graph_file, username, passwd)
-    if not pxexport.graphdb_graph_exists(url, repo, graph, username, passwd):
+    px_imp = PXImportGraphDB(url, username, passwd)
+    imp_resp = px_imp.graphdb_graph(repo, graph, graph_file)
+    px_exp = PXExportGraphDB(url, username, passwd)
+    if not px_exp.graphdb_graph_exists(repo, graph):
         print(f"reimport {url}::{repo} graph {graph} from file {graph_file}...")
         time.sleep(2)
-        return pximport.graphdb_graph(url, repo, graph, graph_file, username, passwd)
+        return px_imp.graphdb_graph(repo, graph, graph_file)
 
 @flow(log_prints=True)
 def export_import_repos_graphs(src_url: str, prefix: str, src_repo: str, graphs: list[str], tgt_url: str, tgt_repo: str, src_user: str = '', src_passwd: str = '', tgt_user: str = '', tgt_passwd: str = ''):
