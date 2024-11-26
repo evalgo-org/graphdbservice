@@ -8,8 +8,8 @@ from jinja2 import Template
 from pxinfra.pxdocker import PXDocker
 from pxinfra import pxbackup
 from pxinfra import pxrestore
-from pxinfra import pxexport
-from pxinfra import pximport
+from pxinfra.pxexport import PXExportGraphDB
+from pxinfra.pximport import PXImportGraphDB
 from pxinfra.pxinfisical import PXInfisical
 
 PX_GRAPHDB_NETWORK='env-px'
@@ -109,12 +109,14 @@ def backup_restore(src_url: str, prefix: str, repos: list[str], src_user:str = '
     return pxrestore.graphdb(tgt_url, bkup)
 
 @flow(log_prints=True)
-def export_import_repos(url: str, prefix: str, repos: list[str], container:str, volume:str, network: str, user:str = '', passwd: str = ''):
+def export_import_repos(src_url: str, prefix: str, repos: list[str], src_user: str = '', src_passwd: str = '', tgt_url: str = '', tgt_user: str = '', tgt_passwd: str = ''):
     pxd = PXDocker(environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST'))
     cnt = pxd.container_by_name(container)
-    resp_repos = list(map(lambda r: pxexport.graphdb_repo(url=url, prefix=prefix, repo=r, user=user, passwd=passwd), repos))
+    px_exp = PXExportGraphDB(src_url, src_user, src_passwd)
+    resp_repos = list(map(lambda r: {'repo': r, 'files': px_exp.graphdb_repo(prefix=prefix, repo=r)}, repos))
     cnt['container'].stop()
-    resp_import = list(map(lambda r: pximport.graphdb_repo(volume, network, r['conf'], r['data']), resp_repos))
+    px_imp = PXImportGraphDB(tgt_url, tgt_user, tgt_passwd)
+    resp_import = list(map(lambda r: pximport.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['conf']), resp_repos))
     cnt['container'].start()
     return resp_import
 
@@ -167,21 +169,21 @@ def export_import_repos_c5_ke_test(repos: list[str]):
     pxsec = PXInfisical()
     secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke-test')
     config = pxsec.bytes_to_dict(secrets_file)
-    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
 
 @flow(log_prints=True)
 def export_import_repos_ke1_ke_test(repos: list[str]):
     pxsec = PXInfisical()
     secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke1-ke-test')
     config = pxsec.bytes_to_dict(secrets_file)
-    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
 
 @flow(log_prints=True)
 def export_import_repos_ke2_ke_test(repos: list[str]):
     pxsec = PXInfisical()
     secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke2-ke-test')
     config = pxsec.bytes_to_dict(secrets_file)
-    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
 
 @flow(log_prints=True)
 def export_import_repos_graphs_c5_ke_test(src_repo: str, graphs: list[str], tgt_repo: str):
@@ -217,7 +219,7 @@ def export_import_repos_c5_ke_ingest(repos: list[str]):
     pxsec = PXInfisical()
     secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke-ingest')
     config = pxsec.bytes_to_dict(secrets_file)
-    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
 
 @flow(log_prints=True)
 def export_import_repos_graphs_c5_ke_ingest(src_repo: str, graphs: list[str], tgt_repo: str):
@@ -239,7 +241,7 @@ def export_import_repos_c5_demo(repos: list[str]):
     pxsec = PXInfisical()
     secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'demo')
     config = pxsec.bytes_to_dict(secrets_file)
-    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
 
 @flow(log_prints=True)
 def export_import_repos_graphs_c5_demo(src_repo: str, graphs: list[str], tgt_repo: str):
@@ -261,7 +263,7 @@ def export_import_repos_c5_dev(repos: list[str]):
     pxsec = PXInfisical()
     secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'dev')
     config = pxsec.bytes_to_dict(secrets_file)
-    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
 
 @flow(log_prints=True)
 def export_import_repos_graphs_c5_dev(src_repo: str, graphs: list[str], tgt_repo: str):
@@ -283,7 +285,7 @@ def export_import_repos_c5_ke1(repos: list[str]):
     pxsec = PXInfisical()
     secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke1', 'stringify')
     config = pxsec.bytes_to_dict(secrets_file)
-    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
 
 @flow(log_prints=True)
 def export_import_repos_graphs_c5_ke1(src_repo: str, graphs: list[str], tgt_repo: str):
@@ -305,7 +307,7 @@ def export_import_repos_c5_ke2(repos: list[str]):
     pxsec = PXInfisical()
     secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke2')
     config = pxsec.bytes_to_dict(secrets_file)
-    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['RST_CONTAINER'], config['RST_VOLUME'], config['RST_NETWORK'], config['BKP_USER'], config['BKP_PASS'])
+    export_import_repos(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
 
 @flow(log_prints=True)
 def export_import_repos_graphs_c5_ke2(src_repo: str, graphs: list[str], tgt_repo: str):

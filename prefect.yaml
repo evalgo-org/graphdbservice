@@ -104,7 +104,7 @@ deployments:
   parameters:
     repos: ['Vestas-demo']
   work_pool:
-    name: build
+    name: mercur
     work_queue_name:
     job_variables: {}
   enforce_parameter_schema: true
