@@ -110,7 +110,6 @@ def backup_restore(src_url: str, prefix: str, repos: list[str], src_user:str = '
 
 @flow(log_prints=True)
 def export_import_repos(src_url: str, prefix: str, repos: list[str], src_user: str = '', src_passwd: str = '', tgt_url: str = '', tgt_user: str = '', tgt_passwd: str = ''):
-    pxd = PXDocker(environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST'))
     px_exp = PXExportGraphDB(src_url, src_user, src_passwd)
     resp_repos = list(map(lambda r: {'repo': r, 'files': px_exp.graphdb_repo(prefix=prefix, repo=r)}, repos))
     px_imp = PXImportGraphDB(tgt_url, tgt_user, tgt_passwd)
