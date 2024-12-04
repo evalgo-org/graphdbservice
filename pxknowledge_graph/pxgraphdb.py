@@ -37,8 +37,20 @@ def default(name: str):
         'container': container}
 
 @task(log_prints=True)
-def default_ports(name: str, ports: dict):
+def default_ports(name: str, ports: dict, rebuild: bool = False):
+    resp_dict = {
+        'image': ':'.join([PX_GRAPHDB_IMAGE, PX_GRAPHDB_VERSION]),
+        'network': PX_GRAPHDB_NETWORK,
+        'volume': name+'-data',
+        'ports': ports}
     pxd = PXDocker(environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST'))
+    found_cnt = pxd.container_by_name(name)
+    if found_cnt is not None:
+        if rebuild:
+            pxd.container_remove(name)
+        else:
+            resp_dict['container'] = found_cnt
+            return resp_dict
     gdb_pull = pxd.image_pull(PX_GRAPHDB_IMAGE, PX_GRAPHDB_VERSION)
     # todo: check the pull result
     gdb_vol = pxd.volume_create(name+'-data', 'local')
@@ -49,12 +61,8 @@ def default_ports(name: str, ports: dict):
     # todo: check mounts
     container = pxd.container_run_ports(':'.join([PX_GRAPHDB_IMAGE, str(PX_GRAPHDB_VERSION)]), name, gdb_nw['name'], mounts, ports, {})
     # todo: check container
-    return {
-        'image': ':'.join([PX_GRAPHDB_IMAGE, PX_GRAPHDB_VERSION]),
-        'network': PX_GRAPHDB_NETWORK,
-        'volume': name+'-data',
-        'container': container,
-        'ports': ports}
+    resp_dict['container'] = container
+    return resp_dict
 
 @task(log_prints=True)
 def default_remove(name: str):
