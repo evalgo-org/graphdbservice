@@ -18,14 +18,14 @@ def export_import_repos_c5_ke1():
 @flow(log_prints=True)
 def local_setup():
     cnt = 'local-import-data'
-    pxgraphdb.default_ports(cnt, {7200:7200})
+    pxgraphdb.default_ports(cnt, {environ.get('RST_SRV_PORT'):environ.get('RST_SRV_PORT')})
     time.sleep(30)
-    pxgraphdb.create_repository('http://localhost:7200', 'ProductData-MDM-keys-EG')
-    pxgraphdb.create_repository('http://localhost:7200', 'ProductData-MDM-keys-US')
+    pxgraphdb.create_repository(environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT'), 'ProductData-MDM-keys-EG')
+    pxgraphdb.create_repository(environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT'), 'ProductData-MDM-keys-US')
 
 @flow(log_prints=True)
 def local_import(repo: str, graph_url: str, graph_file: str):
-    url = 'http://localhost:7200'
+    url = environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT')
     tgt_url = url+"/repositories/"+repo+'/rdf-graphs/service?'+urllib.parse.urlencode({'graph':graph_url})
     print('insert graph', graph_url, 'into repo', repo, 'from file', graph_file, 'into graphdb', tgt_url)
     c = pycurl.Curl()
@@ -41,7 +41,7 @@ def local_import(repo: str, graph_url: str, graph_file: str):
 
 @flow(log_prints=True)
 def local_export_to_binary_rdf(repo: str, graph: str):
-    url = 'http://localhost:7200'
+    url = environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT')
     resp_graph = None
     url_2_path = urlparse(graph)
     graph_file = url_2_path.path.replace('/','_') + '.brf'
