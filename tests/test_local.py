@@ -55,7 +55,6 @@ def test_export_import_repos_graphs(settings):
     settings.pxgraphdb.load_imp(
         settings.settings['RST_SRV']+':'+settings.settings['RST_SRV_PORT']
     )
-    settings.pxgraphdb.imp.
     settings.pxgraphdb.export_import_repos_graphs(
         "c5-to-local-import-graphs", 
         'Chatbot-Demo', 

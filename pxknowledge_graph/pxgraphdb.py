@@ -17,8 +17,6 @@ PX_GRAPHDB_VOLUME='env-px-graphdb-data'
 PX_GRAPHDB_IMAGE='ontotext/graphdb'
 PX_GRAPHDB_VERSION='10.6.3'
 
-# environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST')
-
 class PXGraphDB:
     def __init__(self, docker_host: str = '', docker_api_host: str = '', exp_url: str = '', exp_user: str = '', exp_pass: str = '', imp_url: str = '', imp_user: str = '', imp_pass: str = ''):
         self.pxd = PXDocker(docker_host, docker_api_host)
@@ -107,11 +105,6 @@ class PXGraphDB:
         resp_repos = list(map(lambda r: {'repo': r, 'files': self.exp.graphdb_repo(prefix=prefix, repo=r)}, repos))
         resp_import = list(map(lambda r: self.imp.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['conf']), resp_repos))
         return resp_import
-    def filter_error_response(self, resp: dict, export_responses: list[dict]):
-        found_errors = list(filter(lambda graph: True if graph['graph'] == resp['graph'] else False, export_responses))
-        if len(found_errors) > 0:
-            return found_errors[0]
-        return None
     @task(log_prints=True,persist_result=False)
     def graph_import_with_check(self, repo: str, graph: str, graph_file:str):
         imp_resp = self.imp.graphdb_graph(repo, graph, graph_file)
@@ -123,16 +116,5 @@ class PXGraphDB:
         export_responses = list(map(lambda g: self.exp.graphdb_repo_graph(prefix, src_repo, g), graphs))
         list(map(lambda g: print("exported graph", g), export_responses))
         import_responses = list(map(lambda g: {'graph': g['graph'], 'response': self.graph_import_with_check(tgt_repo, g['graph'], g['file'])}, export_responses))
-        # error_responses = list(filter(lambda resp: True if resp['response'].status_code == 400 else False, import_responses))
-        # if len(error_responses) > 0:
-        #     retry_err_responses = list(filter(lambda resp: filter_error_response(resp, export_responses), ))
         list(map(lambda r: print(r['graph'], r['response']), import_responses))
         return import_responses
-
-# env-ontotext-graphdb-ke-test @ mercur
-# @flow(log_prints=True,persist_result=False)
-# def backup_restore_c5_ke_test(repos: list[str]):
-#     pxsec = PXInfisical()
-#     secrets_file = pxsec.get('eedaff89-6dbb-48c3-826e-0dd20fb1a02b', 'ke-test')
-#     config = pxsec.bytes_to_dict(secrets_file)
-#     backup_restore(config['BKP_SRV'], config['BKP_PREFIX'], repos, config['BKP_USER'], config['BKP_PASS'], config['RST_SRV'], config['RST_USER'], config['RST_PASS'])
