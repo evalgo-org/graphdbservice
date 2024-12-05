@@ -7,3 +7,5 @@ __pycache__
 *.ttl
 dist
 *.brf
+*.txt
+*.tar
