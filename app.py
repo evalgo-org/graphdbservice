@@ -58,6 +58,8 @@ def local_export_to_binary_rdf(repo: str, graph: str):
     print(c.getinfo(pycurl.HTTP_CODE))
     return {'repo':repo, 'file':graph_file, 'graph':graph}
 
+def list_repos_c5():
+    pxgraphdb.export_import_re
 
 if __name__ == '__main__':
     args = sys.argv[1:]
