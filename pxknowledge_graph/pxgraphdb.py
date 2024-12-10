@@ -19,7 +19,8 @@ PX_GRAPHDB_VERSION='10.6.3'
 
 class PXGraphDB:
     def __init__(self, docker_host: str = '', docker_api_host: str = '', exp_url: str = '', exp_user: str = '', exp_pass: str = '', imp_url: str = '', imp_user: str = '', imp_pass: str = ''):
-        self.pxd = PXDocker(docker_host, docker_api_host)
+        if docker_host != '' and docker_api_host != '':
+            self.pxd = PXDocker(docker_host, docker_api_host)
         self.exp = PXExportGraphDB(exp_url, exp_user, exp_pass)
         self.imp = PXImportGraphDB(imp_url, imp_user, imp_pass)
         self.bkp = PXBackupGraphDB(exp_url, exp_user, exp_pass)
