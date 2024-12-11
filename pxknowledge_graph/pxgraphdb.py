@@ -98,6 +98,10 @@ class PXGraphDB:
         # todo: check removed
         return removed
     @flow(log_prints=True,persist_result=False)
+    def backup_all(self, prefix: str):
+        repos = self.exp.graphdb_repositories()
+        return self.bkp.graphdb(prefix, repos)
+    @flow(log_prints=True,persist_result=False)
     def backup_restore(self, prefix: str, repos: list[str]):
         bkup = self.bkp.graphdb(prefix, repos)
         return self.res.graphdb(bkup)
