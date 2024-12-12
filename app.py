@@ -12,10 +12,6 @@ from pxknowledge_graph.pxgraphdb import PXGraphDB
 load_dotenv()
 
 @flow(log_prints=True)
-def export_import_repos_c5_ke1():
-    pxgraphdb.export_import_repos_c5_ke1(['Vestas-demo'])
-
-@flow(log_prints=True)
 def local_setup():
     cnt = 'local-import-data'
     pxg = PXGraphDB(environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST'), imp_url=environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT'))
@@ -58,9 +54,6 @@ def local_export_to_binary_rdf(repo: str, graph: str):
         c.perform()
     print(c.getinfo(pycurl.HTTP_CODE))
     return {'repo':repo, 'file':graph_file, 'graph':graph}
-
-def list_repos_c5():
-    pxgraphdb.export_import_re
 
 if __name__ == '__main__':
     args = sys.argv[1:]
