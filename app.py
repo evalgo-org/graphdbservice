@@ -7,7 +7,7 @@ import pycurl
 import urllib
 from urllib.parse import urlparse
 
-from pxknowledge_graph import pxgraphdb
+from pxknowledge_graph.pxgraphdb import PXGraphDB
 
 load_dotenv()
 
@@ -18,10 +18,11 @@ def export_import_repos_c5_ke1():
 @flow(log_prints=True)
 def local_setup():
     cnt = 'local-import-data'
-    pxgraphdb.default_ports(cnt, {environ.get('RST_SRV_PORT'):environ.get('RST_SRV_PORT')})
+    pxg = PXGraphDB(environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST'))
+    pxg.default_ports(cnt, {environ.get('RST_SRV_PORT'):environ.get('RST_SRV_PORT')})
     time.sleep(30)
-    pxgraphdb.create_repository(environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT'), 'ProductData-MDM-keys-EG')
-    pxgraphdb.create_repository(environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT'), 'ProductData-MDM-keys-US')
+    pxg.create_repository(environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT'), 'ProductData-MDM-keys-EG')
+    pxg.create_repository(environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT'), 'ProductData-MDM-keys-US')
 
 @flow(log_prints=True)
 def local_import(repo: str, graph_url: str, graph_file: str):
