@@ -18,11 +18,11 @@ def export_import_repos_c5_ke1():
 @flow(log_prints=True)
 def local_setup():
     cnt = 'local-import-data'
-    pxg = PXGraphDB(environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST'))
+    pxg = PXGraphDB(environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST'), imp_url=environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT'))
     pxg.default_ports(cnt, {environ.get('RST_SRV_PORT'):environ.get('RST_SRV_PORT')})
     time.sleep(30)
-    pxg.create_repository(environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT'), 'ProductData-MDM-keys-EG')
-    pxg.create_repository(environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT'), 'ProductData-MDM-keys-US')
+    pxg.imp.graphdb_repository_create('ProductData-MDM-keys-EG')
+    pxg.imp.graphdb_repository_create('ProductData-MDM-keys-US')
 
 @flow(log_prints=True)
 def local_import(repo: str, graph_url: str, graph_file: str):
