@@ -53,7 +53,7 @@ class PXGraphDB:
         # todo: check pg_nw
         mounts = [self.pxd.mount_create(name+'-data','/opt/graphdb/home')]
         # todo: check mounts
-        container = self.pxd.container_run(':'.join([PX_GRAPHDB_IMAGE, str(PX_GRAPHDB_VERSION)]), name, gdb_nw['name'], mounts, {})
+        container = self.pxd.container_run(':'.join([PX_GRAPHDB_IMAGE, str(PX_GRAPHDB_VERSION)]), name, gdb_nw['name'], mounts, {}, ['-Dgraphdb.home=/opt/graphdb/home', '-Dgraphdb.workbench.maxUploadSize=1024000000'])
         # todo: check container
         return {
             'image': ':'.join([PX_GRAPHDB_IMAGE, PX_GRAPHDB_VERSION]),
@@ -84,7 +84,7 @@ class PXGraphDB:
         # todo: check pg_nw
         mounts = [self.pxd.mount_create(name+'-data','/opt/graphdb/home')]
         # todo: check mounts
-        container = self.pxd.container_run_ports(':'.join([PX_GRAPHDB_IMAGE, str(PX_GRAPHDB_VERSION)]), name, gdb_nw['name'], mounts, ports, {})
+        container = self.pxd.container_run_ports(':'.join([PX_GRAPHDB_IMAGE, str(PX_GRAPHDB_VERSION)]), name, gdb_nw['name'], mounts, ports, {}, ['-Dgraphdb.home=/opt/graphdb/home', '-Dgraphdb.workbench.maxUploadSize=1024000000'])
         # todo: check container
         resp_dict['container'] = container
         resp_dict['rebuild'] = True
