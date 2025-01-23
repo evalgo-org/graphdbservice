@@ -1,0 +1,27 @@
+version: '3'
+
+tasks:
+  setup:
+    cmds:
+      - docker pull ghcr.io/dask/dask:2025.1.0-py3.12
+      - docker network create dask | true
+      - docker run -d --restart always --network dask --name dask-sched ghcr.io/dask/dask:2025.1.0-py3.12 dask scheduler
+      - docker run -d --restart always --network dask --name dask-worker-1 ghcr.io/dask/dask:2025.1.0-py3.12 dask worker tcp://dask-sched:8786
+      - docker run -d --restart always --network dask --name dask-worker-2 ghcr.io/dask/dask:2025.1.0-py3.12 dask worker tcp://dask-sched:8786
+      - docker run -d --restart always --network dask --name dask-worker-3 ghcr.io/dask/dask:2025.1.0-py3.12 dask worker tcp://dask-sched:8786
+      - docker run -d --restart always --network dask --name dask-worker-4 ghcr.io/dask/dask:2025.1.0-py3.12 dask worker tcp://dask-sched:8786
+  down:
+    cmds:
+      - docker stop dask-worker-4
+      - docker stop dask-worker-3
+      - docker stop dask-worker-2
+      - docker stop dask-worker-1
+      - docker stop dask-sched
+      - docker rm dask-worker-4
+      - docker rm dask-worker-3
+      - docker rm dask-worker-2
+      - docker rm dask-worker-1
+      - docker rm dask-sched
+  run:
+    cmds:
+      - poetry run python parallel.py
