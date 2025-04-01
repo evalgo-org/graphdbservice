@@ -2,6 +2,7 @@ from operator import add
 from prefect_dask import DaskTaskRunner, get_dask_client
 from prefect import flow, task
 import time
+import s3fs
 
 @task(log_prints=True)
 def added(x, y):
