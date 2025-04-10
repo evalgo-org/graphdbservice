@@ -25,3 +25,60 @@ tasks:
   run:
     cmds:
       - poetry run python parallel.py
+  import:
+    cmds:
+      - docker network create test-ontotext-graphdb || true
+      - docker volume create test-ontotext-graphdb-import
+      - >
+        docker run -d 
+        -v test-ontotext-graphdb-import:/opt/graphdb/home 
+        --name test-ontotext-graphdb-import 
+        --network test-ontotext-graphdb 
+        -p 7201:7200 
+        -e GRAPHDB_PARENT_DIR=/opt/graphdb 
+        -e GRAPHDB_HOME=/opt/graphdb/home 
+        -e GRAPHDB_INSTALL_DIR=/opt/graphdb/dist 
+        ontotext/graphdb:10.6.3 -Dgraphdb.home=/opt/graphdb/home -Dgraphdb.workbench.maxUploadSize=1024000000
+  export_1:
+    cmds:
+      - docker network create test-ontotext-graphdb || true
+      - docker volume create test-ontotext-graphdb-export-1
+      - >
+        docker run -d 
+        -v test-ontotext-graphdb-export-1:/opt/graphdb/home 
+        --name test-ontotext-graphdb-export-1 
+        --network test-ontotext-graphdb 
+        -p 7202:7200 
+        -e GRAPHDB_PARENT_DIR=/opt/graphdb 
+        -e GRAPHDB_HOME=/opt/graphdb/home 
+        -e GRAPHDB_INSTALL_DIR=/opt/graphdb/dist 
+        ontotext/graphdb:10.6.3 -Dgraphdb.home=/opt/graphdb/home -Dgraphdb.workbench.maxUploadSize=1024000000
+  export_2:
+    cmds:
+      - docker network create test-ontotext-graphdb || true
+      - docker volume create test-ontotext-graphdb-export-2
+      - >
+        docker run -d 
+        -v test-ontotext-graphdb-export-2:/opt/graphdb/home 
+        --name test-ontotext-graphdb-export-2 
+        --network test-ontotext-graphdb 
+        -p 7203:7200 
+        -e GRAPHDB_PARENT_DIR=/opt/graphdb 
+        -e GRAPHDB_HOME=/opt/graphdb/home 
+        -e GRAPHDB_INSTALL_DIR=/opt/graphdb/dist 
+        ontotext/graphdb:10.6.3 -Dgraphdb.home=/opt/graphdb/home -Dgraphdb.workbench.maxUploadSize=1024000000
+  multi_test:
+    cmds:
+      - task: import
+      - task: export_1
+      - task: export_2
+  multi_clean:
+    cmds:
+      - docker stop test-ontotext-graphdb-import test-ontotext-graphdb-export-1 test-ontotext-graphdb-export-2
+      - docker rm test-ontotext-graphdb-import test-ontotext-graphdb-export-1 test-ontotext-graphdb-export-2
+      - docker volume rm test-ontotext-graphdb-import test-ontotext-graphdb-export-1 test-ontotext-graphdb-export-2
+      - docker network rm test-ontotext-graphdb
+  multi_run:
+    cmds:
+      - poetry run pytest -s .\tests\test_import_multi_export.py
+  

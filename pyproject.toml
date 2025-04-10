@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pxknowledge-graph"
-version = "0.0.25"
+version = "0.0.26"
 description = ""
 authors = ["franciscsimon <francisc.simon@pantopix.com>"]
 readme = "README.md"

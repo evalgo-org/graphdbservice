@@ -1,3 +1,4 @@
+from typing import Any
 from prefect import flow, task
 from os import environ,path
 import requests
@@ -18,18 +19,34 @@ PX_GRAPHDB_IMAGE='ontotext/graphdb'
 PX_GRAPHDB_VERSION='10.6.3'
 
 class PXGraphDB:
-    def __init__(self, docker_host: str = '', docker_api_host: str = '', exp_url: str = '', exp_user: str = '', exp_pass: str = '', imp_url: str = '', imp_user: str = '', imp_pass: str = ''):
+    def __init__(self, docker_host: str = '', docker_api_host: str = '', exp_url: str = '', exp_user: str = '', exp_pass: str = '', imp_url: Any = None, imp_user: str = '', imp_pass: str = ''):
         if docker_host != '' and docker_api_host != '':
             self.pxd = PXDocker(docker_host, docker_api_host)
         self.exp = PXExportGraphDB(exp_url, exp_user, exp_pass)
-        self.imp = PXImportGraphDB(imp_url, imp_user, imp_pass)
+        if isinstance(imp_url, list):
+            self.imp = []
+            for imp in imp_url:
+                # that one needs to be fixed for multiple target credentials
+                self.imp.append(PXImportGraphDB(imp, imp_user, imp_pass))
+        else:
+            self.imp = PXImportGraphDB(imp_url, imp_user, imp_pass)
         self.bkp = PXBackupGraphDB(exp_url, exp_user, exp_pass)
         self.res = PXRestoreGraphDB(imp_url, imp_user, imp_pass)
-    def load_imp(self, url: str , user: str = '', passwd: str = ''):
-        self.imp.url = url
-        self.imp.username = user
-        self.imp.password = passwd
-        self.imp_repos = self.imp.graphdb_repositories()
+    # fixing later for supporting multiple export targets
+    def load_imp(self, url: Any , user: str = '', passwd: str = ''):
+        if isinstance(url, list):
+            self.imp = []
+            self.imp_repos = []
+            for i_target in url:
+                # that one needs to be fixed for multiple target credentials
+                new_i = PXImportGraphDB(i_target, user, passwd)
+                self.imp_repos.append(new_i.graphdb_repositories())
+                self.imp.append(new_i)
+        else:
+            self.imp.url = url
+            self.imp.username = user
+            self.imp.password = passwd
+            self.imp_repos = self.imp.graphdb_repositories()
     def load_exp(self, url: str , user: str = '', passwd: str = ''):
         self.exp.url = url
         self.exp.username = user
@@ -108,8 +125,15 @@ class PXGraphDB:
     @flow(log_prints=True,persist_result=False)
     def export_import_repos(self, prefix:str, repos: list[str]):
         resp_repos = list(map(lambda r: {'repo': r, 'files': self.exp.graphdb_repo(prefix=prefix, repo=r)}, repos))
-        resp_import = list(map(lambda r: self.imp.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['conf']), resp_repos))
-        return resp_import
+        if isinstance(self.imp, list):
+            responses = []
+            for i_target in self.imp:
+                print(i_target.url)
+                responses.append(list(map(lambda r: i_target.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['conf']), resp_repos)))
+            return responses
+        else:
+            resp_import = list(map(lambda r: self.imp.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['conf']), resp_repos))
+            return resp_import
     @task(log_prints=True,persist_result=False)
     def graph_import_with_check(self, repo: str, graph: str, graph_file:str):
         imp_resp = self.imp.graphdb_graph(repo, graph, graph_file)
