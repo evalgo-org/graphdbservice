@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.12,<3.14"
-pxinfra = "0.1.18"
+pxinfra = "0.1.19"
 requests = "^2.32.3"
 jinja2 = "^3.1.4"
 httpx = "0.27.2"

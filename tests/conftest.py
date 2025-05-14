@@ -3,7 +3,7 @@ import pytest
 
 from dotenv import load_dotenv, dotenv_values
 
-from pxknowledge_graph.pxgraphdb import PXGraphDB
+from pxgraphdb.pxgraphdb import PXGraphDB
 
 class Settings:
     def __init__(self):
@@ -12,7 +12,7 @@ class Settings:
         self.pxgraphdb = PXGraphDB(
             environ.get('DOCKER_HOST'), 
             environ.get('DOCKER_API_HOST'),
-            exp_url=environ.get('KAESER_GRAPHDB_PROD_URL'), exp_user=environ.get('KAESER_GRAPHDB_PROD_USER'), exp_pass=environ.get('KAESER_GRAPHDB_PROD_PASS'),
+            exp_url=environ.get('KAESER_GRAPHDB_PROD_URL'),
             imp_url='http://localhost:7200')
 
 @pytest.fixture
