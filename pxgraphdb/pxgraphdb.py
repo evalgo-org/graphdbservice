@@ -6,8 +6,6 @@ from requests.auth import HTTPBasicAuth
 from jinja2 import Template
 
 from pxinfra.pxdocker import PXDocker
-from pxinfra.pxbackup import PXBackupGraphDB
-from pxinfra.pxrestore import PXRestoreGraphDB
 from pxinfra.pxexport import PXExportGraphDB
 from pxinfra.pximport import PXImportGraphDB
 from pxinfra.pxinfisical import PXInfisical
@@ -29,8 +27,6 @@ class PXGraphDB:
                 self.imp.append(PXImportGraphDB(imp, imp_user, imp_pass))
         else:
             self.imp = PXImportGraphDB(imp_url, imp_user, imp_pass)
-        self.bkp = PXBackupGraphDB(exp_url, exp_user, exp_pass)
-        self.res = PXRestoreGraphDB(imp_url, imp_user, imp_pass)
     # fixing later for supporting multiple export targets
     def load_imp(self, url: Any , user: str = '', passwd: str = ''):
         if isinstance(url, list):
@@ -51,14 +47,6 @@ class PXGraphDB:
         self.exp.username = user
         self.exp.password = passwd
         self.exp_repos = self.exp.graphdb_repositories()
-    def load_res(self, url: str , user: str = '', passwd: str = ''):
-        self.res.url = url
-        self.res.username = user
-        self.res.password = passwd
-    def load_bkp(self, url: str , user: str = '', passwd: str = ''):
-        self.bkp.url = url
-        self.bkp.username = user
-        self.bkp.password = passwd
     def default(self, name: str):    
         gdb_pull = self.pxd.image_pull(PX_GRAPHDB_IMAGE, PX_GRAPHDB_VERSION)
         # todo: check the pull result
@@ -110,12 +98,6 @@ class PXGraphDB:
         removed = container['container'].remove()
         # todo: check removed
         return removed
-    def backup_all(self, prefix: str):
-        repos = self.exp.graphdb_repositories()
-        return self.bkp.graphdb(prefix, repos)
-    def backup_restore(self, prefix: str, repos: list[str]):
-        bkup = self.bkp.graphdb(prefix, repos)
-        return self.res.graphdb(bkup)
     def export_import_repos(self, prefix:str, repos: list[str]):
         resp_repos = list(map(lambda r: {'repo': r, 'files': self.exp.graphdb_repo(prefix=prefix, repo=r)}, repos))
         if isinstance(self.imp, list):
