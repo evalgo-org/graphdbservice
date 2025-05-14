@@ -1,5 +1,4 @@
 from typing import Any
-from prefect import flow, task
 from os import environ,path
 import requests
 import time
@@ -60,7 +59,6 @@ class PXGraphDB:
         self.bkp.url = url
         self.bkp.username = user
         self.bkp.password = passwd
-    @task(log_prints=True,persist_result=False)
     def default(self, name: str):    
         gdb_pull = self.pxd.image_pull(PX_GRAPHDB_IMAGE, PX_GRAPHDB_VERSION)
         # todo: check the pull result
@@ -77,7 +75,6 @@ class PXGraphDB:
             'network': PX_GRAPHDB_NETWORK,
             'volume': name+'-data',
             'container': container}
-    @task(log_prints=True,persist_result=False)
     def default_ports(self, name: str, ports: dict, rebuild: bool = False):
         resp_dict = {
             'image': ':'.join([PX_GRAPHDB_IMAGE, PX_GRAPHDB_VERSION]),
@@ -106,7 +103,6 @@ class PXGraphDB:
         resp_dict['container'] = container
         resp_dict['rebuild'] = True
         return resp_dict
-    @task(log_prints=True,persist_result=False)
     def default_remove(self, name: str):
         container = self.pxd.container_by_name(name)
         stopped = container['container'].stop()
@@ -114,15 +110,12 @@ class PXGraphDB:
         removed = container['container'].remove()
         # todo: check removed
         return removed
-    @flow(log_prints=True,persist_result=False)
     def backup_all(self, prefix: str):
         repos = self.exp.graphdb_repositories()
         return self.bkp.graphdb(prefix, repos)
-    @flow(log_prints=True,persist_result=False)
     def backup_restore(self, prefix: str, repos: list[str]):
         bkup = self.bkp.graphdb(prefix, repos)
         return self.res.graphdb(bkup)
-    @flow(log_prints=True,persist_result=False)
     def export_import_repos(self, prefix:str, repos: list[str]):
         resp_repos = list(map(lambda r: {'repo': r, 'files': self.exp.graphdb_repo(prefix=prefix, repo=r)}, repos))
         if isinstance(self.imp, list):
@@ -134,13 +127,11 @@ class PXGraphDB:
         else:
             resp_import = list(map(lambda r: self.imp.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['conf']), resp_repos))
             return resp_import
-    @task(log_prints=True,persist_result=False)
     def graph_import_with_check(self, repo: str, graph: str, graph_file:str):
         imp_resp = self.imp.graphdb_graph(repo, graph, graph_file)
         if not self.exp.graphdb_graph_exists(repo, graph):
             print(f"reimport {repo} graph {graph} from file {graph_file}...")
             return self.imp.graphdb_graph(repo, graph, graph_file)
-    @flow(log_prints=True,persist_result=False)
     def export_import_repos_graphs(self, prefix: str, src_repo: str, graphs: list[str], tgt_repo: str):
         export_responses = list(map(lambda g: self.exp.graphdb_repo_graph(prefix, src_repo, g), graphs))
         list(map(lambda g: print("exported graph", g), export_responses))

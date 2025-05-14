@@ -1,17 +1,15 @@
 from dotenv import load_dotenv
 from os import environ
 import sys
-from prefect import flow
 import time
 import pycurl
 import urllib
 from urllib.parse import urlparse
 
-from pxknowledge_graph.pxgraphdb import PXGraphDB
+from pxgraphdb.pxgraphdb import PXGraphDB
 
 load_dotenv()
 
-@flow(log_prints=True)
 def local_setup():
     cnt = 'local-import-data'
     pxg = PXGraphDB(environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST'), imp_url=environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT'))
@@ -20,7 +18,6 @@ def local_setup():
     pxg.imp.graphdb_repository_create('ProductData-MDM-keys-EG')
     pxg.imp.graphdb_repository_create('ProductData-MDM-keys-US')
 
-@flow(log_prints=True)
 def local_import(repo: str, graph_url: str, graph_file: str):
     url = environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT')
     tgt_url = url+"/repositories/"+repo+'/rdf-graphs/service?'+urllib.parse.urlencode({'graph':graph_url})
@@ -36,7 +33,6 @@ def local_import(repo: str, graph_url: str, graph_file: str):
     c.close()
     return status_code
 
-@flow(log_prints=True)
 def local_export_to_binary_rdf(repo: str, graph: str):
     url = environ.get('RST_SRV')+':'+environ.get('RST_SRV_PORT')
     resp_graph = None
