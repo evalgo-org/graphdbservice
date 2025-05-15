@@ -108,14 +108,14 @@ class PXGraphDB:
         else:
             resp_import = list(map(lambda r: self.imp.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['config']), resp_repos))
             return resp_import
-    def graph_import_with_check(self, repo: str, graph: str, graph_file:str):
-        imp_resp = self.imp.graphdb_graph(repo, graph, graph_file)
+    def graph_import_with_check(self, repo: str, graph: str):
+        imp_resp = self.imp.graphdb_graph(repo, graph)
         if not self.exp.graphdb_graph_exists(repo, graph):
-            print(f"reimport {repo} graph {graph} from file {graph_file}...")
-            return self.imp.graphdb_graph(repo, graph, graph_file)
+            print(f"reimport {repo} graph {graph}...")
+            return self.imp.graphdb_graph(repo, graph)
     def export_import_repos_graphs(self, prefix: str, src_repo: str, graphs: list[str], tgt_repo: str):
         export_responses = list(map(lambda g: self.exp.graph(src_repo, g), graphs))
         list(map(lambda g: print("exported graph", g), export_responses))
-        import_responses = list(map(lambda g: {'graph': g['graph'], 'response': self.graph_import_with_check(tgt_repo, g['graph'], g['file'])}, export_responses))
+        import_responses = list(map(lambda g: {'graph': g['graph'], 'response': self.graph_import_with_check(tgt_repo, g['graph'])}, export_responses))
         list(map(lambda r: print(r['graph'], r['response']), import_responses))
         return import_responses
