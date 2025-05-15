@@ -114,7 +114,7 @@ class PXGraphDB:
             print(f"reimport {repo} graph {graph} from file {graph_file}...")
             return self.imp.graphdb_graph(repo, graph, graph_file)
     def export_import_repos_graphs(self, prefix: str, src_repo: str, graphs: list[str], tgt_repo: str):
-        export_responses = list(map(lambda g: self.exp.graphdb_repo_graph(prefix, src_repo, g), graphs))
+        export_responses = list(map(lambda g: self.exp.graph(src_repo, g), graphs))
         list(map(lambda g: print("exported graph", g), export_responses))
         import_responses = list(map(lambda g: {'graph': g['graph'], 'response': self.graph_import_with_check(tgt_repo, g['graph'], g['file'])}, export_responses))
         list(map(lambda r: print(r['graph'], r['response']), import_responses))
