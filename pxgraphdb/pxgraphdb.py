@@ -99,15 +99,14 @@ class PXGraphDB:
         # todo: check removed
         return removed
     def export_import_repos(self, prefix:str, repos: list[str]):
-        resp_repos = list(map(lambda r: {'repo': r, 'files': self.exp.graphdb_repo(prefix=prefix, repo=r)}, repos))
+        resp_repos = list(map(lambda r: {'repo': r, 'files': self.exp.graphdb_repo(prefix=prefix, name=r)}, repos))
         if isinstance(self.imp, list):
             responses = []
             for i_target in self.imp:
-                print(i_target.url)
-                responses.append(list(map(lambda r: i_target.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['conf']), resp_repos)))
+                responses.append(list(map(lambda r: i_target.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['config']), resp_repos)))
             return responses
         else:
-            resp_import = list(map(lambda r: self.imp.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['conf']), resp_repos))
+            resp_import = list(map(lambda r: self.imp.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['config']), resp_repos))
             return resp_import
     def graph_import_with_check(self, repo: str, graph: str, graph_file:str):
         imp_resp = self.imp.graphdb_graph(repo, graph, graph_file)
