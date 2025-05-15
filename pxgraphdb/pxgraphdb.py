@@ -110,7 +110,7 @@ class PXGraphDB:
             return resp_import
     def graph_import_with_check(self, repo: str, graph: str):
         imp_resp = self.imp.graphdb_graph(repo, graph)
-        if not self.exp.graphdb_graph_exists(repo, graph):
+        if not self.exp.graph_exists(repo, graph):
             print(f"reimport {repo} graph {graph}...")
             return self.imp.graphdb_graph(repo, graph)
     def export_import_repos_graphs(self, prefix: str, src_repo: str, graphs: list[str], tgt_repo: str):
