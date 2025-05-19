@@ -41,11 +41,13 @@ class PXGraphDB:
             self.imp.url = url
             self.imp.username = user
             self.imp.password = passwd
+            self.imp.reload_headers()
             self.imp_repos = self.imp.graphdb_repositories()
     def load_exp(self, url: str , user: str = '', passwd: str = ''):
         self.exp.url = url
         self.exp.username = user
         self.exp.password = passwd
+        self.exp.reload_headers()
         self.exp_repos = self.exp.graphdb_repositories()
     def default(self, name: str):    
         gdb_pull = self.pxd.image_pull(PX_GRAPHDB_IMAGE, PX_GRAPHDB_VERSION)
