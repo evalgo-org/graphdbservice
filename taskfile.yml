@@ -101,4 +101,7 @@ tasks:
   multi_run:
     cmds:
       - poetry run pytest -s .\tests\test_import_multi_export.py
+  app:
+    cmds:
+      - time poetry run python app.py
   

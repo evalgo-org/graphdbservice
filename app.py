@@ -51,24 +51,61 @@ def local_export_to_binary_rdf(repo: str, graph: str):
     print(c.getinfo(pycurl.HTTP_CODE))
     return {'repo':repo, 'file':graph_file, 'graph':graph}
 
-if __name__ == '__main__':
-    args = sys.argv[1:]
-    if len(args) > 0:
-        if args[0] == 'export_import_repos_c5_ke1':
-            export_import_repos_c5_ke1()
-        elif args[0] == 'local-setup':
-            local_setup()
-        elif args[0] == 'local-import':
-            local_import(args[1],args[2],args[3])
-        elif args[0] == 'local-export-to-binary':
-            local_export_to_binary_rdf(args[1],args[2])
+def migrate_graphdb(exp_url: str, imp_url: str):
+    pxg = None
+    if exp_url == "http://graphdb.buerkert.px":
+        pxg = PXGraphDB(environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST'), exp_url=exp_url, exp_user="admin", exp_pass="J3iDMalh7ak=", imp_url=imp_url)
     else:
-        print("poetry run python app.py [option]")
-        print("options:")
-        print("  export_import_repos_c5_ke1")
-        print("  local-setup")
-        print("  local-import-graph <repo> <graph_url> <graph_file>")
-        print("  local-export-to-binary <repo> <graph_url>")
+        pxg = PXGraphDB(environ.get('DOCKER_HOST'), environ.get('DOCKER_API_HOST'), exp_url=exp_url, imp_url=imp_url)
+    pxg.exp_repos = pxg.exp.graphdb_repositories()
+    repos = []
+    for repo in pxg.exp_repos["results"]["bindings"]:
+        repos.append(repo["id"]["value"])
+    # print(repos)
+    for imp in pxg.export_import_repos(prefix="migrate-graphdb", repos=repos):
+        print(imp)
+
+if __name__ == '__main__':
+    servers_map = [
+        # {"exp_url": "http://build-001.graphdb.px:7200", "imp_url":"http://tmp-build-001.graphdb.px:7200"},
+        {"exp_url": "http://build-002.graphdb.px:7200", "imp_url":"http://tmp-build-002.graphdb.px:7200"},
+        # {"exp_url": "http://build-003.graphdb.px:7200", "imp_url":"http://tmp-build-003.graphdb.px:7200"},
+        # {"exp_url": "http://build-004.graphdb.px:7200", "imp_url":"http://tmp-build-004.graphdb.px:7200"},
+        # {"exp_url": "http://build-005.graphdb.px:7200", "imp_url":"http://tmp-build-005.graphdb.px:7200"},
+        # {"exp_url": "http://build-006.graphdb.px:7200", "imp_url":"http://tmp-build-006.graphdb.px:7200"},
+        # {"exp_url": "http://build-007.graphdb.px:7200", "imp_url":"http://tmp-build-007.graphdb.px:7200"},
+        # {"exp_url": "http://build-008.graphdb.px:7200", "imp_url":"http://tmp-build-008.graphdb.px:7200"},
+        # {"exp_url": "http://build-009.graphdb.px:7200", "imp_url":"http://tmp-build-009.graphdb.px:7200"},
+        # {"exp_url": "http://build-010.graphdb.px:7200", "imp_url":"http://tmp-build-010.graphdb.px:7200"},
+        # {"exp_url": "http://dev.graphdb.px:7200", "imp_url":"http://tmp-graphdb.buerkert.px:7200"},
+        # {"exp_url": "http://demo.graphdb.px:7200", "imp_url":"http://tmp-graphdb.buerkert.px:7200"},
+        # {"exp_url": "http://ke1.graphdb.px:7200", "imp_url":"http://tmp-graphdb.buerkert.px:7200"},
+        # {"exp_url": "http://ke2.graphdb.px:7200", "imp_url":"http://tmp-graphdb.buerkert.px:7200"},
+        # {"exp_url": "http://ke-ingest.graphdb.px:7200", "imp_url":"http://tmp-graphdb.buerkert.px:7200"},
+        # {"exp_url": "http://ke-test.graphdb.px:7200", "imp_url":"http://tmp-graphdb.buerkert.px:7200"},
+        # {"exp_url": "http://graphdb.buerkert.px", "imp_url":"http://tmp-graphdb.buerkert.px:7200"}
+    ]
+    for srv in servers_map:
+        print(srv)
+        migrate_graphdb(**srv)
+
+    # args = sys.argv[1:]
+    # if len(args) > 0:
+    #     if args[0] == 'export_import_repos_c5_ke1':
+    #         export_import_repos_c5_ke1()
+    #     elif args[0] == 'local-setup':
+    #         local_setup()
+    #     elif args[0] == 'local-import':
+    #         local_import(args[1],args[2],args[3])
+    #     elif args[0] == 'local-export-to-binary':
+    #         local_export_to_binary_rdf(args[1],args[2])
+    # else:
+    #     print("poetry run python app.py [option]")
+    #     print("options:")
+    #     print("  export_import_repos_c5_ke1")
+    #     print("  local-setup")
+    #     print("  local-import-graph <repo> <graph_url> <graph_file>")
+    #     print("  local-export-to-binary <repo> <graph_url>")
 
 # poetry run python app.py local-import ProductData-MDM-keys-EG 'https://data.kaeser.com/KKH/ARTICLES' ~/Downloads/statements.rdf
 # poetry run python app.py local-export-to-binary ProductData-MDM-keys-EG 'https://data.kaeser.com/KKH/ARTICLES'
