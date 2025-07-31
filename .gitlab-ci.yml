@@ -10,6 +10,8 @@ stages:
 
 build:
   stage: build
+  tags:
+    - local
   image: ghcr.io/astral-sh/uv:$UV_VERSION-python$PYTHON_VERSION-$BASE_LAYER
   script:
     - uv sync --index https://cache.hz.pantopix.net/repository/pypi-private/simple/
@@ -21,6 +23,8 @@ build:
 
 release:
   stage: release
+  tags:
+    - local
   image: ghcr.io/astral-sh/uv:$UV_VERSION-python$PYTHON_VERSION-$BASE_LAYER
   script: 
     - uv publish --index pantopix
