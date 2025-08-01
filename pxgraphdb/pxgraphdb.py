@@ -110,7 +110,7 @@ class PXGraphDB:
             return responses
         else:
             # resp_created = list(map(lambda r: self.imp.create_from_turtle(r['repo'], r['files']['config']), resp_repos))
-            resp_imported = list(map(lambda r: self.imp.insert(r['repo'], r['files']['data']), resp_repos))
+            resp_imported = list(map(lambda r: self.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['config']), resp_repos))
             # resp_import = list(map(lambda r: self.imp.graphdb_repo_api(r['repo'], r['files']['data'], r['files']['config']), resp_repos))
             # return {"created": resp_created, "inserted": resp_imported}
             return resp_imported
