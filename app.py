@@ -66,9 +66,11 @@ def migrate_graphdb(exp_url: str, imp_url: str):
         print(imp)
 
 if __name__ == '__main__':
-    servers_map = [
+    pxg = PXGraphDB()
+    pxg.graphdb_repo_create("test", True)
+    # servers_map = [
         # {"exp_url": "http://build-001.graphdb.px:7200", "imp_url":"http://tmp-build-001.graphdb.px:7200"},
-        {"exp_url": "http://build-002.graphdb.px:7200", "imp_url":"http://tmp-build-002.graphdb.px:7200"},
+        # {"exp_url": "http://build-002.graphdb.px:7200", "imp_url":"http://tmp-build-002.graphdb.px:7200"},
         # {"exp_url": "http://build-003.graphdb.px:7200", "imp_url":"http://tmp-build-003.graphdb.px:7200"},
         # {"exp_url": "http://build-004.graphdb.px:7200", "imp_url":"http://tmp-build-004.graphdb.px:7200"},
         # {"exp_url": "http://build-005.graphdb.px:7200", "imp_url":"http://tmp-build-005.graphdb.px:7200"},
@@ -84,10 +86,10 @@ if __name__ == '__main__':
         # {"exp_url": "http://ke-ingest.graphdb.px:7200", "imp_url":"http://tmp-graphdb.buerkert.px:7200"},
         # {"exp_url": "http://ke-test.graphdb.px:7200", "imp_url":"http://tmp-graphdb.buerkert.px:7200"},
         # {"exp_url": "http://graphdb.buerkert.px", "imp_url":"http://tmp-graphdb.buerkert.px:7200"}
-    ]
-    for srv in servers_map:
-        print(srv)
-        migrate_graphdb(**srv)
+    # ]
+    # for srv in servers_map:
+    #     print(srv)
+    #     migrate_graphdb(**srv)
 
     # args = sys.argv[1:]
     # if len(args) > 0:
