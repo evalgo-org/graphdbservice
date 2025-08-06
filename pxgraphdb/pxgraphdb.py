@@ -65,6 +65,13 @@ class PXGraphDB:
             'network': PX_GRAPHDB_NETWORK,
             'volume': name+'-data',
             'container': container}
+    def graphdb_repositories(self, imp: bool = True):
+        results = None
+        if imp:
+            results = self.imp.graphdb_repositories()
+        else:
+            results = self.exp.graphdb_repositories()
+        return list(map(lambda repo: repo['id']['value'] , results['results']['bindings']))
     def default_ports(self, name: str, ports: dict, rebuild: bool = False):
         resp_dict = {
             'image': ':'.join([PX_GRAPHDB_IMAGE, PX_GRAPHDB_VERSION]),
