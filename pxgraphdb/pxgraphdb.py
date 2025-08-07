@@ -73,12 +73,12 @@ class PXGraphDB:
         else:
             results = self.exp.graphdb_repositories()
         return list(map(lambda repo: repo['id']['value'] , results['results']['bindings']))
-    def graphdb_repo_create(self, repo:str, imp: bool = True):
+    def graphdb_repo_create(self, repo:str, inference: str = "empty", imp: bool = True):
         with open(str(Path(__file__).parent.absolute())+sep+'new_repository_config.ttl.jinja') as f:
             tmpl = Template(f.read())
             tmpFilePath = str(Path(__file__).parent.absolute())+sep+"tmp.create.repository.ttl"
             with open(tmpFilePath, "w") as tmplFile:
-                tmplFile.write(tmpl.render(repository_id=repo))
+                tmplFile.write(tmpl.render(repository_id=repo, inference=inference))
         if imp:
             return self.imp.create_from_turtle(repo, tmpFilePath)
         else:
