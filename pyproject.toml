@@ -1,6 +1,6 @@
 [project]
 name = "pxgraphdb"
-version = "0.0.37"
+version = "0.0.38"
 description = ""
 authors = [{ name = "franciscsimon", email = "francisc.simon@pantopix.com" }]
 requires-python = ">=3.12,<3.14"
@@ -21,7 +21,6 @@ dependencies = [
     "docker>=7.1.0",
     "python-on-whales>=0.78.0",
     "lxml>=5.3.0,<6.0.0",
-    "gitpython>=3.1.45",
 ]
 
 [dependency-groups]

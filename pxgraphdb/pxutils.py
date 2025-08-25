@@ -2,7 +2,6 @@ import shutil
 from os import mkdir , path, remove, environ
 import base64
 from uuid import uuid4
-from git import Repo
 from urllib.parse import urlparse
 from os import environ
 
@@ -20,29 +19,6 @@ def check_required_env_vars(vars: list[str]):
         return True
     list(map(lambda v: print("ENV VAR NOT FOUND",v), not_found))
     return False
-
-def git_clone(src: str, branch: str):
-    repo_info = urlparse(src)
-    tld = repo_info.netloc.split('@')
-    if len(tld) > 1:
-        print('from', tld[1],'clone repository',repo_info.path, 'branch', branch)
-    else:
-        print('from', repo_info.netloc,'clone repository',repo_info.path, 'branch', branch)
-    if path.isdir(PX_UTILS_REPO):
-        shutil.rmtree(PX_UTILS_REPO)
-    return Repo.clone_from(src, PX_UTILS_REPO, branch=branch)
-
-def git_clone_pkg(src: str, branch: str):
-    repo_info = urlparse(src)
-    tld = repo_info.netloc.split('@')
-    if len(tld) > 1:
-        print('from', tld[1],'clone repository',repo_info.path, 'branch', branch)
-    else:
-        print('from', repo_info.netloc,'clone repository',repo_info.path, 'branch', branch)
-    if path.isdir(PX_UTILS_REPO):
-        shutil.rmtree(PX_UTILS_REPO)
-    Repo.clone_from(src, PX_UTILS_REPO+path.sep+path.basename(src), branch=branch)
-    return PX_UTILS_REPO+path.sep+path.basename(src)
 
 def copy_file_to_volume(file_path: str, volume: str, volume_path: str = ''):
     if path.isdir('tmp_dir'):
