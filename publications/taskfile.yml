@@ -1,0 +1,110 @@
+version: "3"
+
+env:
+  REPO: pxpim-graph-etl-2
+  DOCKER_TAG: amd64-main-2025-08-12 
+
+tasks:
+  prepare:
+    cmds:
+      - task: clean
+      - pxtool gitea --url https://git.pantopix.net --token {{.GITEA_ACCESS_TOKEN}} --owner kaeser --repo {{.REPO}} --branch master
+      - tar xfvz {{.REPO}}-main.tar.gz
+      - mv {{.REPO}} pxpim-graph-etl
+      - rm -fv {{.REPO}}-main.tar.gz
+      - cp publications.py pxpim-graph-etl/
+      - cp pyproject.toml.pxpim-graph-etl pxpim-graph-etl/pyproject.toml
+      - pxtool secrets --host secrets.mars.pantopix.net --client_id {{.SECRETS_ACCESS_KEY}} --client_secret {{.SECRETS_SECRET_KEY}} --env prod --format netrc --project_id 1ee100bd-80a0-4a84-9747-b6ead2bf3dd8 > .netrc
+      - mv .netrc pxpim-graph-etl/
+      - pxtool s3aws --url="https://artifacts-api.hz.pantopix.net" --access-key {{.MINIO_ACCESS_KEY}} --secret-key {{.MINIO_SECRET_KEY}} --minio --get --bucket kaeser-publications --remote publications.consumer.json --local publications.consumer.json
+      - cp publications.consumer.json pxpim-graph-etl/
+      - cp -f settings.py pxpim-graph-etl/kaeser_graph_etl/graphpipes/modules/settings.py
+      - cp -f rest.py pxpim-graph-etl/rest.py
+  default:
+    cmds:
+      - task: prepare
+      - docker buildx build -t kaeser-publications -f Dockerfile pxpim-graph-etl
+  env:
+    cmds:
+      - task: prepare
+      - pxtool secrets --host secrets.mars.pantopix.net --client_id {{.SECRETS_ACCESS_KEY}} --client_secret {{.SECRETS_SECRET_KEY}} --env consumer --format env --project_id d614be52-12c4-4ffb-a07d-1e4cd0ff5883  > .env 
+      - cp .env pxpim-graph-etl/optinal.env
+      - docker buildx build -t kaeser-publications -f Dockerfile pxpim-graph-etl
+  run:
+    cmds:
+      - docker run -d --rm --name test-run-kaeser --env-file .env docker.io/library/kaeser-publications
+  run-env:
+    cmds:
+      - docker run --rm --name test-run-kaeser -e UVICORN_HOST=0.0.0.0 docker.io/library/kaeser-publications
+  clean:
+    cmds:
+      - rm -rf pxpim-graph-etl || true
+  env-003:
+    cmds:
+      - pxtool secrets --host secrets.mars.pantopix.net --client_id {{.SECRETS_ACCESS_KEY}} --client_secret {{.SECRETS_SECRET_KEY}} --env consumer-003 --format env --project_id d614be52-12c4-4ffb-a07d-1e4cd0ff5883  > build-003.env 
+      - cp -fv build-003.env pxpim-graph-etl/optinal.env
+      - docker buildx build -t kaeser-publications-003 -f Dockerfile pxpim-graph-etl
+  env-004:
+    cmds:
+      - pxtool secrets --host secrets.mars.pantopix.net --client_id {{.SECRETS_ACCESS_KEY}} --client_secret {{.SECRETS_SECRET_KEY}} --env consumer-004 --format env --project_id d614be52-12c4-4ffb-a07d-1e4cd0ff5883  > build-004.env
+      - cp -fv build-004.env pxpim-graph-etl/optinal.env
+      - docker buildx build -t kaeser-publications-004 -f Dockerfile pxpim-graph-etl
+  env-005:
+    cmds:
+      - pxtool secrets --host secrets.mars.pantopix.net --client_id {{.SECRETS_ACCESS_KEY}} --client_secret {{.SECRETS_SECRET_KEY}} --env consumer-005 --format env --project_id d614be52-12c4-4ffb-a07d-1e4cd0ff5883  > build-005.env
+      - cp -fv build-005.env pxpim-graph-etl/optinal.env
+      - docker buildx build -t kaeser-publications-005 -f Dockerfile pxpim-graph-etl
+  env-006:
+    cmds:
+      - pxtool secrets --host secrets.mars.pantopix.net --client_id {{.SECRETS_ACCESS_KEY}} --client_secret {{.SECRETS_SECRET_KEY}} --env consumer-006 --format env --project_id d614be52-12c4-4ffb-a07d-1e4cd0ff5883  > build-006.env
+      - cp -fv build-006.env pxpim-graph-etl/optinal.env
+      - docker buildx build -t kaeser-publications-006 -f Dockerfile pxpim-graph-etl
+  env-008:
+    cmds:
+      - pxtool secrets --host secrets.mars.pantopix.net --client_id {{.SECRETS_ACCESS_KEY}} --client_secret {{.SECRETS_SECRET_KEY}} --env consumer-008 --format env --project_id d614be52-12c4-4ffb-a07d-1e4cd0ff5883  > build-008.env
+      - cp -fv build-008.env pxpim-graph-etl/optinal.env
+      - docker buildx build -t kaeser-publications-008 -f Dockerfile pxpim-graph-etl
+  environments:
+    cmds:
+      - task: prepare
+      - task: env
+      - task: env-003
+      - task: env-004
+      - task: env-005
+      - task: env-006
+      - task: env-008
+  push:
+    cmds:
+      - docker tag docker.io/library/kaeser-publications private.hz.pantopix.net/kaeser/pxpim_graph_etl/publications/consumer:{{.DOCKER_TAG}}
+      - docker tag docker.io/library/kaeser-publications-003 private.hz.pantopix.net/kaeser/pxpim_graph_etl/publications/consumer-003:{{.DOCKER_TAG}}
+      - docker tag docker.io/library/kaeser-publications-004 private.hz.pantopix.net/kaeser/pxpim_graph_etl/publications/consumer-004:{{.DOCKER_TAG}}
+      - docker tag docker.io/library/kaeser-publications-005 private.hz.pantopix.net/kaeser/pxpim_graph_etl/publications/consumer-005:{{.DOCKER_TAG}}
+      - docker tag docker.io/library/kaeser-publications-006 private.hz.pantopix.net/kaeser/pxpim_graph_etl/publications/consumer-006:{{.DOCKER_TAG}}
+      - docker tag docker.io/library/kaeser-publications-008 private.hz.pantopix.net/kaeser/pxpim_graph_etl/publications/consumer-008:{{.DOCKER_TAG}}
+      - docker push private.hz.pantopix.net/kaeser/pxpim_graph_etl/publications/consumer:{{.DOCKER_TAG}}
+      - docker push private.hz.pantopix.net/kaeser/pxpim_graph_etl/publications/consumer-003:{{.DOCKER_TAG}}
+      - docker push private.hz.pantopix.net/kaeser/pxpim_graph_etl/publications/consumer-004:{{.DOCKER_TAG}}
+      - docker push private.hz.pantopix.net/kaeser/pxpim_graph_etl/publications/consumer-005:{{.DOCKER_TAG}}
+      - docker push private.hz.pantopix.net/kaeser/pxpim_graph_etl/publications/consumer-006:{{.DOCKER_TAG}}
+      - docker push private.hz.pantopix.net/kaeser/pxpim_graph_etl/publications/consumer-008:{{.DOCKER_TAG}}
+  update:
+    cmds:
+      - task: clean
+      - task: environments
+      - task: push
+  deploy-dev:
+    cmds:
+      - cf login -a {{.CF_API_URL}} -u {{.CF_USER}} -p {{.CF_PASSWORD}} -o kaeserd -s pantopix
+      - cf push -f manifest.003.yml
+      - cf push -f manifest.004.yml
+      - cf push -f manifest.005.yml
+      - cf push -f manifest.006.yml
+      - cf push -f manifest.008.yml
+  deploy-test:
+    cmds:
+      - cf login -a {{.CF_API_URL}} -u {{.CF_USER}} -p {{.CF_PASSWORD}} -o kaeserq -s pantopix
+      - cf push -f manifest.003.yml
+      - cf push -f manifest.004.yml
+      - cf push -f manifest.005.yml
+      - cf push -f manifest.006.yml
+      - cf push -f manifest.008.yml
