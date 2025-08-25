@@ -1,6 +1,6 @@
 [project]
 name = "pxgraphdb"
-version = "0.0.39"
+version = "0.0.40"
 description = ""
 authors = [{ name = "franciscsimon", email = "francisc.simon@pantopix.com" }]
 requires-python = ">=3.12,<3.14"
