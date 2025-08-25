@@ -16,7 +16,6 @@ dependencies = [
     "pandas>=2.2.3,<3",
     "fsspec>=2024.12.0,<2025",
     "s3fs>=2024.12.0,<2025",
-    "pxinfra==0.1.29",
 ]
 
 [dependency-groups]

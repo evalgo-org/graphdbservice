@@ -6,10 +6,10 @@ import time
 from requests.auth import HTTPBasicAuth
 from jinja2 import Template
 
-from pxinfra.pxdocker import PXDocker
-from pxinfra.pxexport import PXExportGraphDB
-from pxinfra.pximport import PXImportGraphDB
-from pxinfra.pxinfisical import PXInfisical
+from pxgraphdb.pxdocker import PXDocker
+from pxgraphdb.pxexport import PXExportGraphDB
+from pxgraphdb.pximport import PXImportGraphDB
+from pxgraphdb.pxinfisical import PXInfisical
 
 PX_GRAPHDB_NETWORK='env-px'
 PX_GRAPHDB_VOLUME='env-px-graphdb-data'
