@@ -5,15 +5,9 @@
 ### install uv 
 https://docs.astral.sh/uv/getting-started/installation/
 
-### .netrc file in your home folder on linux /home/<user>, macos /Users/<user> or windows /<Users|Benutzer>/<user>
-````
-machine cache.hz.pantopix.net
-login <username>
-password <s3cr3t>
-````
 ### run the command
 ````
-uv sync --index https://cache.hz.pantopix.net/repository/pypi-private/simple/
+uv sync
 ````
 
 ## run different options
@@ -30,7 +24,7 @@ uv run prefect deploy --all
 
 ## use this package in other projects import
 ````
-uv add "pxknowledge-graph==0.0.7"
+uv add "pxknowledge-graph==0.0.35"
 
 ````
 
@@ -41,3 +35,6 @@ from pxknowledge_graph import pxgraphdb
 pxgraphdb.create_repository('http://{xxx.graphdb.px}:7200', 'my-test-repository')
 
 ````
+
+# publications
+the publications folder contains all code needed to build and run on SAP BTP as a publications consumer.
