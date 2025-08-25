@@ -835,7 +835,7 @@ wheels = [
 
 [[package]]
 name = "pxgraphdb"
-version = "0.0.35"
+version = "0.0.36"
 source = { editable = "." }
 dependencies = [
     { name = "dask", extra = ["distributed"] },
@@ -849,9 +849,7 @@ dependencies = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "pycurl" },
-    { name = "pygit" },
     { name = "python-dotenv" },
-    { name = "python-git" },
     { name = "python-on-whales" },
     { name = "requests" },
     { name = "s3fs" },
@@ -876,9 +874,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.2.2,<3" },
     { name = "pandas", specifier = ">=2.2.3,<3" },
     { name = "pycurl", specifier = ">=7.45.6" },
-    { name = "pygit", specifier = ">=0.1" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
-    { name = "python-git", specifier = ">=2018.2.1" },
     { name = "python-on-whales", specifier = ">=0.78.0" },
     { name = "requests", specifier = ">=2.32.3,<3" },
     { name = "s3fs", specifier = ">=2024.12.0,<2025" },
@@ -966,12 +962,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pygit"
-version = "0.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/cd/e8/839dacf13a5de30eff7e0815a3cfc051bd80532f83d862e0c14433b03286/pygit-0.1.tar.gz", hash = "sha256:fe02a667309e044069053313a1cb056012be10388e7ae284ebbd35480d7be58e", size = 6712, upload-time = "2008-06-25T19:38:27Z" }
-
-[[package]]
 name = "pygments"
 version = "2.19.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1015,18 +1005,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f6/b0/4bc07ccd3572a2f9df7e6782f52b0c6c90dcbb803ac4a167702d7d0dfe1e/python_dotenv-1.1.1.tar.gz", hash = "sha256:a8a6399716257f45be6a007360200409fce5cda2661e3dec71d23dc15f6189ab", size = 41978, upload-time = "2025-06-24T04:21:07.341Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5f/ed/539768cf28c661b5b068d66d96a2f155c4971a5d55684a514c1a0e0dec2f/python_dotenv-1.1.1-py3-none-any.whl", hash = "sha256:31f23644fe2602f88ff55e1f5c79ba497e01224ee7737937930c448e4d0e24dc", size = 20556, upload-time = "2025-06-24T04:21:06.073Z" },
-]
-
-[[package]]
-name = "python-git"
-version = "2018.2.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "send2trash" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a5/c6/645f405c8dd3094b85b0f01916517ba025ab8855b252e2a73fec51947f09/python-git-2018.2.1.tar.gz", hash = "sha256:2da0a75b562bc966d8a3bc1d6a2f8fd9f0fb3a3d3f2eff2239213bcc400bde82", size = 11761, upload-time = "2019-01-08T18:39:36.839Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f0/6f/664d1dce126168f4fb91e74e8f7bd26db72f0b2a49b0fa1c9f9742daf1ca/python_git-2018.2.1-py3-none-any.whl", hash = "sha256:87ef4aef32a65f44e301cff42e5d5f660a2ba8d6b9d7c021faedbb9028a57ba9", size = 10453, upload-time = "2019-01-08T18:39:34.69Z" },
 ]
 
 [[package]]
@@ -1117,15 +1095,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/96/88/e2fc4fc2a618126ac3cea9b16a4abc5a37dff2522067c9730b5d72d67ac3/s3fs-2024.12.0.tar.gz", hash = "sha256:1b0f3a8f5946cca5ba29871d6792ab1e4528ed762327d8aefafc81b73b99fd56", size = 76578, upload-time = "2024-12-19T20:05:42.779Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f7/af/eaec1466887348d7f6cc9d3a668b30b62a4629fb187d0268146118ba3d5e/s3fs-2024.12.0-py3-none-any.whl", hash = "sha256:d8665549f9d1de083151582437a2f10d5f3b3227c1f8e67a2b0b730db813e005", size = 30196, upload-time = "2024-12-19T20:05:40.095Z" },
-]
-
-[[package]]
-name = "send2trash"
-version = "1.8.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/fd/3a/aec9b02217bb79b87bbc1a21bc6abc51e3d5dcf65c30487ac96c0908c722/Send2Trash-1.8.3.tar.gz", hash = "sha256:b18e7a3966d99871aefeb00cfbcfdced55ce4871194810fc71f4aa484b953abf", size = 17394, upload-time = "2024-04-07T00:01:09.267Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/40/b0/4562db6223154aa4e22f939003cb92514c79f3d4dccca3444253fd17f902/Send2Trash-1.8.3-py3-none-any.whl", hash = "sha256:0c31227e0bd08961c7665474a3d1ef7193929fedda4233843689baa056be46c9", size = 18072, upload-time = "2024-04-07T00:01:07.438Z" },
 ]
 
 [[package]]
