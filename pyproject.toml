@@ -29,11 +29,11 @@ test = ["pytest>=8.3.4,<9"]
 [tool.uv]
 default-groups = ["test"]
 
-[[tool.uv.index]]
-name = "pantopix"
-url = "https://cache.hz.pantopix.net/repository/pypi-private/simple/"
-publish-url = "https://cache.hz.pantopix.net/repository/pypi-private/"
-explicit = true
+#[[tool.uv.index]]
+#name = "pantopix"
+#url = "https://cache.hz.pantopix.net/repository/pypi-private/simple/"
+#publish-url = "https://cache.hz.pantopix.net/repository/pypi-private/"
+#explicit = true
 
 [build-system]
 requires = ["hatchling"]
