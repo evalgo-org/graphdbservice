@@ -143,3 +143,11 @@ class PXGraphDB:
         import_responses = list(map(lambda g: {'graph': g['graph'], 'response': self.graph_import_with_check(tgt_repo, g['graph'])}, export_responses))
         list(map(lambda r: print(r['graph'], r['response']), import_responses))
         return import_responses
+    
+    @staticmethod
+    def get_repo_config_template() -> str:
+        content = ""
+        print()
+        with open(str(Path(__file__).parent.absolute())+sep+'new_repository_config.ttl.jinja') as tmpl:
+            content = tmpl.read()
+        return content
