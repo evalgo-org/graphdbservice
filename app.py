@@ -67,9 +67,9 @@ def migrate_graphdb(exp_url: str, imp_url: str):
 
 if __name__ == '__main__':
     pxg = PXGraphDB()
-    # pxg.graphdb_repo_create("test", True)
+    pxg.graphdb_repo_create("test", True)
     # pxg.get_repo_config_template()
-    pxg.check_repository_config()
+    # pxg.check_repository_config()
     # servers_map = [
         # {"exp_url": "http://build-001.graphdb.px:7200", "imp_url":"http://tmp-build-001.graphdb.px:7200"},
         # {"exp_url": "http://build-002.graphdb.px:7200", "imp_url":"http://tmp-build-002.graphdb.px:7200"},
