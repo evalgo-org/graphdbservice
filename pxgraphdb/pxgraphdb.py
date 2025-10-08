@@ -73,16 +73,35 @@ class PXGraphDB:
         else:
             results = self.exp.graphdb_repositories()
         return list(map(lambda repo: repo['id']['value'] , results['results']['bindings']))
-    def graphdb_repo_create(self, repo:str, inference: str = "empty", imp: bool = True):
+    # def graphdb_repo_create(self, repo:str, inference: str = "empty", imp: bool = True):
+    #     with open(str(Path(__file__).parent.absolute())+sep+'new_repository_config.ttl.jinja') as f:
+    #         tmpl = Template(f.read())
+    #         tmpFilePath = str(Path(__file__).parent.absolute())+sep+"tmp.create.repository.ttl"
+    #         with open(tmpFilePath, "w") as tmplFile:
+    #             tmplFile.write(tmpl.render(repository_id=repo, inference=inference))
+    #     if imp:
+    #         return self.imp.create_from_turtle(repo, tmpFilePath)
+    #     else:
+    #         return self.exp.create_from_turtle(repo, tmpFilePath)
+    def graphdb_repo_create(self, repo:str, imp: bool = True):
         with open(str(Path(__file__).parent.absolute())+sep+'new_repository_config.ttl.jinja') as f:
             tmpl = Template(f.read())
             tmpFilePath = str(Path(__file__).parent.absolute())+sep+"tmp.create.repository.ttl"
             with open(tmpFilePath, "w") as tmplFile:
-                tmplFile.write(tmpl.render(repository_id=repo, inference=inference))
+                tmplFile.write(tmpl.render(repository_id=repo))
         if imp:
             return self.imp.create_from_turtle(repo, tmpFilePath)
         else:
             return self.exp.create_from_turtle(repo, tmpFilePath)
+        
+    def check_repository_config(self, repo:str = "test-repo", inference: str = "empty"):
+        with open(str(Path(__file__).parent.absolute())+sep+'new_repository_config.ttl.jinja') as f:
+            print('path: ' + str(Path(__file__).parent.absolute())+sep+'new_repository_config.ttl.jinja')
+            tmpl = Template(f.read())
+            tmpFilePath = str(Path(__file__).parent.absolute())+sep+"tmp.create.repository.ttl"
+            with open(tmpFilePath, "w") as tmplFile:
+                tmplFile.write(tmpl.render(repository_id=repo, inference=inference))
+            
     def default_ports(self, name: str, ports: dict, rebuild: bool = False):
         resp_dict = {
             'image': ':'.join([PX_GRAPHDB_IMAGE, PX_GRAPHDB_VERSION]),
@@ -147,7 +166,7 @@ class PXGraphDB:
     @staticmethod
     def get_repo_config_template() -> str:
         content = ""
-        print()
         with open(str(Path(__file__).parent.absolute())+sep+'new_repository_config.ttl.jinja') as tmpl:
             content = tmpl.read()
+            print(content)
         return content

@@ -31,7 +31,7 @@ class PXGraphDBInfra:
         with open(path.dirname(__file__)+path.sep+'config'+path.sep+'new_repository_config.ttl.jinja') as tmpl:
             tmpl_content = Template(tmpl.read())
         with open(tmpl_file, 'w') as wtmpl:
-            wtmpl.write(tmpl_content.render(repository_id=name))
+            wtmpl.write(tmpl_content.render(repository_id=name, inference="empty"))
         res = self.http.request_encode_body("POST", create_url, headers=self.headers, fields={"config": (tmpl_file, open(tmpl_file).read(), "text/turtle")})
         Path(tmpl_file).unlink()
         return res
