@@ -162,6 +162,17 @@ func getFileType(filename string) string {
 	}
 }
 
+// Helper function to extract repository names from GraphDB bindings
+func getRepositoryNames(bindings []db.GraphDBBinding) []string {
+	names := make([]string, 0)
+	for _, binding := range bindings {
+		if value, exists := binding.Id["value"]; exists {
+			names = append(names, value)
+		}
+	}
+	return names
+}
+
 // Migration handler with multipart form support
 func migrationHandler(c echo.Context) error {
 	// Check if this is a multipart form request
@@ -617,140 +628,172 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 	case "graph-import":
 		fmt.Println("DEBUG: Starting graph-import processing")
 		
+		fmt.Printf("DEBUG: Fetching repositories from %s\n", task.Tgt.URL)
 		tgtGraphDB,err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
 		if err != nil {
-			return nil, fmt.Errorf("failed to connect to GraphDB at %s", task.Tgt.URL)
+			return nil, err
+		}
+		
+		if tgtGraphDB.Results.Bindings == nil {
+			fmt.Printf("ERROR: GraphDB returned nil bindings from %s\n", task.Tgt.URL)
+			return nil, fmt.Errorf("failed to get repositories from GraphDB at %s - nil response", task.Tgt.URL)
+		}
+		
+		fmt.Printf("DEBUG: Found %d repositories in GraphDB\n", len(tgtGraphDB.Results.Bindings))
+		
+		// List all available repositories for debugging
+		if len(tgtGraphDB.Results.Bindings) == 0 {
+			fmt.Printf("WARNING: No repositories found in GraphDB at %s\n", task.Tgt.URL)
+			fmt.Printf("DEBUG: Attempting to create repository '%s' or continue assuming it exists\n", task.Tgt.Repo)
+			// Continue with import attempt - the repository might exist but not be listed
+		} else {
+			fmt.Printf("DEBUG: Available repositories: ")
+			for i, bind := range tgtGraphDB.Results.Bindings {
+				if i > 0 {
+					fmt.Printf(", ")
+				}
+				fmt.Printf("'%s'", bind.Id["value"])
+			}
+			fmt.Printf("\n")
 		}
 		
 		foundRepo := false
 		for _, bind := range tgtGraphDB.Results.Bindings {
 			if bind.Id["value"] == task.Tgt.Repo {
 				foundRepo = true
-				fmt.Printf("DEBUG: Found target repository: %s\n", task.Tgt.Repo)
-				
-				fmt.Printf("DEBUG: Listing graphs in repository: %s\n", task.Tgt.Repo)
-				graphsResponse, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
-				if err != nil {
-					fmt.Printf("ERROR: Failed to list graphs: %v\n", err)
-					return nil, fmt.Errorf("failed to list graphs in repository %s: %w", task.Tgt.Repo, err)
-				}
-				
-				if graphsResponse == nil {
-					fmt.Printf("WARNING: GraphDB returned nil response for listing graphs\n")
-					// Continue without deleting existing graph - it might not exist
-				} else {
-					fmt.Printf("DEBUG: Found %d graphs in repository\n", len(graphsResponse.Results.Bindings))
-					// Check if target graph exists and delete it if found
-					for _, bind := range graphsResponse.Results.Bindings {
-						if bind.ContextID.Value == task.Tgt.Graph {
-							fmt.Printf("DEBUG: Deleting existing graph: %s\n", task.Tgt.Graph)
-							err := db.GraphDBDeleteGraph(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph)
-							if err != nil {
-								fmt.Printf("WARNING: Failed to delete existing graph: %v\n", err)
-								// Don't fail the operation, continue with import
-							}
-							break
-						}
-					}
-				}
-
-				// Handle uploaded files for import
-				if files != nil {
-					fileKey := fmt.Sprintf("task_%d_files", taskIndex)
-					fmt.Printf("DEBUG: Looking for files with key: %s\n", fileKey)
-					
-					if taskFiles, exists := files[fileKey]; exists {
-						fmt.Printf("DEBUG: Found %d files to import\n", len(taskFiles))
-						result["uploaded_files"] = len(taskFiles)
-						result["file_names"] = getFileNames(taskFiles)
-						
-						// Process each uploaded file for import
-						for i, fileHeader := range taskFiles {
-							fmt.Printf("DEBUG: Processing file %d: %s (size: %d bytes)\n", i, fileHeader.Filename, fileHeader.Size)
-							
-							func() {
-								defer func() {
-									if r := recover(); r != nil {
-										fmt.Printf("PANIC in file processing %s: %v\n", fileHeader.Filename, r)
-									}
-								}()
-								
-								file, err := fileHeader.Open()
-								if err != nil {
-									fmt.Printf("ERROR: Failed to open file %s: %v\n", fileHeader.Filename, err)
-									return
-								}
-								defer file.Close()
-								
-								// Save file temporarily and import it
-								tempFileName := fmt.Sprintf("/tmp/%s", fileHeader.Filename)
-								fmt.Printf("DEBUG: Creating temp file: %s\n", tempFileName)
-								
-								tempFile, err := os.Create(tempFileName)
-								if err != nil {
-									fmt.Printf("ERROR: Failed to create temp file: %v\n", err)
-									return
-								}
-								defer tempFile.Close()
-								defer func() {
-									fmt.Printf("DEBUG: Removing temp file: %s\n", tempFileName)
-									os.Remove(tempFileName)
-								}()
-								
-								// Copy uploaded file to temp file
-								if _, err := file.Seek(0, 0); err != nil {
-									fmt.Printf("ERROR: Failed to seek file: %v\n", err)
-									return
-								}
-								
-								fmt.Printf("DEBUG: Copying file content to temp file\n")
-								bytesWritten, err := tempFile.ReadFrom(file)
-								if err != nil {
-									fmt.Printf("ERROR: Failed to copy file: %v\n", err)
-									return
-								}
-								tempFile.Close()
-								
-								fmt.Printf("DEBUG: Copied %d bytes to temp file\n", bytesWritten)
-								
-								// Determine import method based on file extension
-								filename := strings.ToLower(fileHeader.Filename)
-								
-								if strings.HasSuffix(filename, ".brf") {
-									// Binary RDF file - use restore method
-									fmt.Printf("DEBUG: Importing binary RDF file: %s\n", fileHeader.Filename)
-									err = db.GraphDBRestoreBrf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, tempFileName)
-									if err != nil {
-										fmt.Printf("ERROR: Failed to import binary RDF file %s: %v\n", fileHeader.Filename, err)
-										return
-									}
-								} else {
-									// Text-based RDF file - use standard import
-									fmt.Printf("DEBUG: Importing text RDF file: %s\n", fileHeader.Filename)
-									err = db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph, tempFileName)
-									if err != nil {
-										fmt.Printf("ERROR: Failed to import RDF file %s: %v\n", fileHeader.Filename, err)
-										return
-									}
-								}
-								
-								fmt.Printf("DEBUG: Successfully imported file: %s\n", fileHeader.Filename)
-								result[fmt.Sprintf("file_%d_processed", i)] = fileHeader.Filename
-								result[fmt.Sprintf("file_%d_type", i)] = getFileType(filename)
-							}()
-						}
-					} else {
-						return nil, fmt.Errorf("graph-import action requires files to be uploaded with key 'task_%d_files'", taskIndex)
-					}
-				} else {
-					return nil, fmt.Errorf("graph-import action requires files to be uploaded")
-				}
-				break // Exit the repository loop once we found and processed the target repo
+				break
 			}
 		}
-		if !foundRepo {
-			return nil, errors.New("could not find required tgt repository " + task.Tgt.Repo)
+		
+		if !foundRepo && len(tgtGraphDB.Results.Bindings) > 0 {
+			fmt.Printf("ERROR: Repository '%s' not found in list of %d repositories\n", task.Tgt.Repo, len(tgtGraphDB.Results.Bindings))
+			return nil, fmt.Errorf("repository '%s' not found. Available repositories: %v", task.Tgt.Repo, getRepositoryNames(tgtGraphDB.Results.Bindings))
 		}
+		
+		// If we reach here, either the repo was found, or the repository list was empty
+		// In case of empty list, we'll attempt the import anyway
+		if foundRepo {
+			fmt.Printf("DEBUG: Repository '%s' found in GraphDB\n", task.Tgt.Repo)
+		} else {
+			fmt.Printf("DEBUG: Repository list was empty, attempting import to '%s' anyway\n", task.Tgt.Repo)
+		}
+		
+		// Try to list graphs (this might fail if repository doesn't exist)
+		fmt.Printf("DEBUG: Listing graphs in repository: %s\n", task.Tgt.Repo)
+		graphsResponse, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
+		if err != nil {
+			fmt.Printf("WARNING: Failed to list graphs (repository might not exist): %v\n", err)
+			// Continue with import - we'll try to import anyway
+		} else if graphsResponse.Results.Bindings == nil {
+			fmt.Printf("WARNING: GraphDB returned nil response for listing graphs\n")
+		} else {
+			fmt.Printf("DEBUG: Found %d graphs in repository\n", len(graphsResponse.Results.Bindings))
+			// Check if target graph exists and delete it if found
+			for _, bind := range graphsResponse.Results.Bindings {
+				if bind.ContextID.Value == task.Tgt.Graph {
+					fmt.Printf("DEBUG: Deleting existing graph: %s\n", task.Tgt.Graph)
+					err := db.GraphDBDeleteGraph(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph)
+					if err != nil {
+						fmt.Printf("WARNING: Failed to delete existing graph: %v\n", err)
+						// Don't fail the operation, continue with import
+					}
+					break
+				}
+			}
+		}
+
+		// Handle uploaded files for import
+		if files != nil {
+			fileKey := fmt.Sprintf("task_%d_files", taskIndex)
+			fmt.Printf("DEBUG: Looking for files with key: %s\n", fileKey)
+			
+			if taskFiles, exists := files[fileKey]; exists {
+				fmt.Printf("DEBUG: Found %d files to import\n", len(taskFiles))
+				result["uploaded_files"] = len(taskFiles)
+				result["file_names"] = getFileNames(taskFiles)
+				
+				// Process each uploaded file for import
+				for i, fileHeader := range taskFiles {
+					fmt.Printf("DEBUG: Processing file %d: %s (size: %d bytes)\n", i, fileHeader.Filename, fileHeader.Size)
+					
+					func() {
+						defer func() {
+							if r := recover(); r != nil {
+								fmt.Printf("PANIC in file processing %s: %v\n", fileHeader.Filename, r)
+							}
+						}()
+						
+						file, err := fileHeader.Open()
+						if err != nil {
+							fmt.Printf("ERROR: Failed to open file %s: %v\n", fileHeader.Filename, err)
+							return
+						}
+						defer file.Close()
+						
+						// Save file temporarily and import it
+						tempFileName := fmt.Sprintf("/tmp/%s", fileHeader.Filename)
+						fmt.Printf("DEBUG: Creating temp file: %s\n", tempFileName)
+						
+						tempFile, err := os.Create(tempFileName)
+						if err != nil {
+							fmt.Printf("ERROR: Failed to create temp file: %v\n", err)
+							return
+						}
+						defer tempFile.Close()
+						defer func() {
+							fmt.Printf("DEBUG: Removing temp file: %s\n", tempFileName)
+							os.Remove(tempFileName)
+						}()
+						
+						// Copy uploaded file to temp file
+						if _, err := file.Seek(0, 0); err != nil {
+							fmt.Printf("ERROR: Failed to seek file: %v\n", err)
+							return
+						}
+						
+						fmt.Printf("DEBUG: Copying file content to temp file\n")
+						bytesWritten, err := tempFile.ReadFrom(file)
+						if err != nil {
+							fmt.Printf("ERROR: Failed to copy file: %v\n", err)
+							return
+						}
+						tempFile.Close()
+						
+						fmt.Printf("DEBUG: Copied %d bytes to temp file\n", bytesWritten)
+						
+						// Determine import method based on file extension
+						filename := strings.ToLower(fileHeader.Filename)
+						
+						if strings.HasSuffix(filename, ".brf") {
+							// Binary RDF file - use restore method
+							fmt.Printf("DEBUG: Importing binary RDF file: %s\n", fileHeader.Filename)
+							err = db.GraphDBRestoreBrf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, tempFileName)
+							if err != nil {
+								fmt.Printf("ERROR: Failed to import binary RDF file %s: %v\n", fileHeader.Filename, err)
+								return
+							}
+						} else {
+							// Text-based RDF file - use standard import
+							fmt.Printf("DEBUG: Importing text RDF file: %s\n", fileHeader.Filename)
+							err = db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph, tempFileName)
+							if err != nil {
+								fmt.Printf("ERROR: Failed to import RDF file %s: %v\n", fileHeader.Filename, err)
+								return
+							}
+						}
+						
+						fmt.Printf("DEBUG: Successfully imported file: %s\n", fileHeader.Filename)
+						result[fmt.Sprintf("file_%d_processed", i)] = fileHeader.Filename
+						result[fmt.Sprintf("file_%d_type", i)] = getFileType(filename)
+					}()
+				}
+			} else {
+				return nil, fmt.Errorf("graph-import action requires files to be uploaded with key 'task_%d_files'", taskIndex)
+			}
+		} else {
+			return nil, fmt.Errorf("graph-import action requires files to be uploaded")
+		}
+				
 		result["message"] = "Graph imported successfully"
 		result["graph"] = task.Tgt.Graph
 
