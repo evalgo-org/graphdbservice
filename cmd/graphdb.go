@@ -597,22 +597,38 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		fmt.Println("DEBUG: Starting graph-import processing")
 		
 		tgtGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		if tgtGraphDB == nil {
+			return nil, fmt.Errorf("failed to connect to GraphDB at %s", task.Tgt.URL)
+		}
+		
 		foundRepo := false
 		for _, bind := range tgtGraphDB.Results.Bindings {
 			if bind.Id["value"] == task.Tgt.Repo {
 				foundRepo = true
 				fmt.Printf("DEBUG: Found target repository: %s\n", task.Tgt.Repo)
 				
-				tgtGraphDB, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
+				fmt.Printf("DEBUG: Listing graphs in repository: %s\n", task.Tgt.Repo)
+				graphsResponse, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
 				if err != nil {
-					return nil, err
+					fmt.Printf("ERROR: Failed to list graphs: %v\n", err)
+					return nil, fmt.Errorf("failed to list graphs in repository %s: %w", task.Tgt.Repo, err)
 				}
-				for _, bind := range tgtGraphDB.Results.Bindings {
-					if bind.ContextID.Value == task.Tgt.Graph {
-						fmt.Printf("DEBUG: Deleting existing graph: %s\n", task.Tgt.Graph)
-						err := db.GraphDBDeleteGraph(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph)
-						if err != nil {
-							return nil, err
+				
+				if graphsResponse == nil {
+					fmt.Printf("WARNING: GraphDB returned nil response for listing graphs\n")
+					// Continue without deleting existing graph - it might not exist
+				} else {
+					fmt.Printf("DEBUG: Found %d graphs in repository\n", len(graphsResponse.Results.Bindings))
+					// Check if target graph exists and delete it if found
+					for _, bind := range graphsResponse.Results.Bindings {
+						if bind.ContextID.Value == task.Tgt.Graph {
+							fmt.Printf("DEBUG: Deleting existing graph: %s\n", task.Tgt.Graph)
+							err := db.GraphDBDeleteGraph(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph)
+							if err != nil {
+								fmt.Printf("WARNING: Failed to delete existing graph: %v\n", err)
+								// Don't fail the operation, continue with import
+							}
+							break
 						}
 					}
 				}
@@ -708,6 +724,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 				} else {
 					return nil, fmt.Errorf("graph-import action requires files to be uploaded")
 				}
+				break // Exit the repository loop once we found and processed the target repo
 			}
 		}
 		if !foundRepo {
