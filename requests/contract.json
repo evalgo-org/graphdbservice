@@ -34,7 +34,7 @@
             }
         },
         {
-            "action": "delete-repo",
+            "action": "repo-delete",
             "tgt": {
                 "url":"",
                 "username": "",
@@ -43,7 +43,7 @@
             }
         },
         {
-            "action": "delete-graph",
+            "action": "graph-delete",
             "tgt": {
                 "url":"",
                 "username": "",
@@ -53,7 +53,7 @@
             }
         },
         {
-            "action": "create-repo",
+            "action": "repo-create",
             "tgt": {
                 "url":"",
                 "username": "",
@@ -62,7 +62,7 @@
             }
         },
         {
-            "action": "import-graph",
+            "action": "graph-import",
             "tgt": {
                 "url":"",
                 "username": "",
@@ -72,7 +72,7 @@
             }
         },
         {
-            "action": "rename-repo",
+            "action": "repo-rename",
             "tgt": {
                 "url":"",
                 "username": "",
@@ -82,7 +82,7 @@
             }
         },
         {
-            "action": "rename-graph",
+            "action": "graph-rename",
             "tgt": {
                 "url":"",
                 "username": "",
