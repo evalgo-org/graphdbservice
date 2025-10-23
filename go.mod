@@ -3,7 +3,7 @@ module evalgo.org/graphservice
 go 1.25.1
 
 require (
-	eve.evalgo.org v0.0.3-0.20251023231745-faf1dbaef4c9
+	eve.evalgo.org v0.0.3
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.16.0
