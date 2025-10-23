@@ -1,0 +1,18 @@
+---
+applications:
+  - name: graphdb-service
+    memory: 1024M
+    instances: 1
+    disk_quota: 2G
+    instances: 1
+    health-check-type: http
+    health-check-http-endpoint: /health
+    health-check-invocation-timeout: 60
+    command: ./graphdb-service graphdb
+    routes:
+      - route: service-pxgraphdb-dev.cfapps.eu10.hana.ondemand.com
+    buildpacks:
+      - binary_buildpack
+    env:
+      GOPACKAGES: evalgo.org/graphservice
+      API_KEY: s1zAUbyROFm516zuaWuyGy3c+AzCnGv6OmnYCUhU0/Y=
