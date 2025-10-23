@@ -349,6 +349,7 @@ func validateTask(task Task) error {
 		"graph-delete":    true,
 		"repo-create":     true,
 		"graph-import":    true,
+		"repo-import":     true,
 		"repo-rename":     true,
 		"graph-rename":    true,
 	}
@@ -362,7 +363,7 @@ func validateTask(task Task) error {
 		if task.Src == nil || task.Tgt == nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "Both src and tgt are required for %s", task.Action)
 		}
-	case "repo-delete", "graph-delete", "repo-create", "graph-import":
+	case "repo-delete", "graph-delete", "repo-create", "graph-import", "repo-import":
 		if task.Tgt == nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "tgt is required for %s", task.Action)
 		}
@@ -537,6 +538,114 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		}
 		result["message"] = "Graph deleted successfully"
 		result["graph"] = task.Tgt.Graph
+
+	case "repo-import":
+		fmt.Println("DEBUG: Starting repo-import processing")
+		
+		// Check if target repository exists
+		fmt.Printf("DEBUG: Fetching repositories from %s\n", task.Tgt.URL)
+		tgtGraphDB, err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		if err != nil {
+			return nil, err
+		}
+		
+		foundRepo := false
+		for _, bind := range tgtGraphDB.Results.Bindings {
+			if bind.Id["value"] == task.Tgt.Repo {
+				foundRepo = true
+				break
+			}
+		}
+		
+		if !foundRepo {
+			fmt.Printf("ERROR: Repository '%s' not found\n", task.Tgt.Repo)
+			return nil, fmt.Errorf("repository '%s' not found. Available repositories: %v", task.Tgt.Repo, getRepositoryNames(tgtGraphDB.Results.Bindings))
+		}
+		
+		fmt.Printf("DEBUG: Repository '%s' found in GraphDB\n", task.Tgt.Repo)
+		
+		// Get BRF data file from source repository (if specified) or use a local file
+		// This follows the same pattern as repo-migration
+		if task.Src != nil && task.Src.Repo != "" {
+			// Import from another repository's BRF file
+			srcGraphDB, err := db.GraphDBRepositories(task.Src.URL, task.Src.Username, task.Src.Password)
+			if err != nil {
+				return nil, err
+			}
+			
+			srcFoundRepo := false
+			dataFile := ""
+			for _, bind := range srcGraphDB.Results.Bindings {
+				if bind.Id["value"] == task.Src.Repo {
+					srcFoundRepo = true
+					dataFile = db.GraphDBRepositoryBrf(task.Src.URL, task.Src.Username, task.Src.Password, bind.Id["value"])
+					break
+				}
+			}
+			
+			if !srcFoundRepo {
+				return nil, fmt.Errorf("source repository '%s' not found", task.Src.Repo)
+			}
+			
+			fmt.Printf("DEBUG: Importing BRF data from %s to repository %s\n", task.Src.Repo, task.Tgt.Repo)
+			err = db.GraphDBRestoreBrf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, dataFile)
+			if err != nil {
+				return nil, err
+			}
+			
+			// Clean up the temporary BRF file
+			os.Remove(dataFile)
+			
+			result["message"] = "Repository import completed successfully"
+			result["source_repository"] = task.Src.Repo
+			result["target_repository"] = task.Tgt.Repo
+		} else {
+			// Handle file uploads if using multipart form
+			if files != nil {
+				fileKey := fmt.Sprintf("task_%d_files", taskIndex)
+				if taskFiles, exists := files[fileKey]; exists && len(taskFiles) > 0 {
+					// Process the first BRF file
+					fileHeader := taskFiles[0]
+					
+					file, err := fileHeader.Open()
+					if err != nil {
+						return nil, fmt.Errorf("failed to open file %s: %w", fileHeader.Filename, err)
+					}
+					defer file.Close()
+					
+					// Save file temporarily
+					tempFileName := fmt.Sprintf("/tmp/%s", fileHeader.Filename)
+					defer os.Remove(tempFileName)
+					
+					tempFile, err := os.Create(tempFileName)
+					if err != nil {
+						return nil, fmt.Errorf("failed to create temp file: %w", err)
+					}
+					defer tempFile.Close()
+					
+					_, err = tempFile.ReadFrom(file)
+					if err != nil {
+						return nil, fmt.Errorf("failed to copy file: %w", err)
+					}
+					tempFile.Close()
+					
+					// Import the BRF file
+					fmt.Printf("DEBUG: Importing BRF file %s to repository %s\n", fileHeader.Filename, task.Tgt.Repo)
+					err = db.GraphDBRestoreBrf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, tempFileName)
+					if err != nil {
+						return nil, fmt.Errorf("failed to import BRF file: %w", err)
+					}
+					
+					result["message"] = "Repository import completed successfully"
+					result["imported_file"] = fileHeader.Filename
+					result["target_repository"] = task.Tgt.Repo
+				} else {
+					return nil, fmt.Errorf("no BRF files provided for import")
+				}
+			} else {
+				return nil, fmt.Errorf("no source repository or files specified for import")
+			}
+		}
 
 	case "repo-create":
 		repoName := task.Tgt.Repo
