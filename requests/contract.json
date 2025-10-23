@@ -1,0 +1,96 @@
+{
+    "version": "v0.0.1",
+    "tasks": [
+        {
+            "action": "repo-migration",
+            "src": {
+                "url":"",
+                "username": "",
+                "password": "",
+                "repo": ""
+            },
+            "tgt": {
+                "url":"",
+                "username": "",
+                "password": "",
+                "repo" :""
+            }
+        },
+        {
+            "action": "graph-migration",
+            "src": {
+                "url":"",
+                "username": "",
+                "password": "",
+                "repo": "",
+                "graph": ""
+            },
+            "tgt": {
+                "url":"",
+                "username": "",
+                "password": "",
+                "repo" :"",
+                "graph": ""
+            }
+        },
+        {
+            "action": "delete-repo",
+            "tgt": {
+                "url":"",
+                "username": "",
+                "password": "",
+                "repo" :""
+            }
+        },
+        {
+            "action": "delete-graph",
+            "tgt": {
+                "url":"",
+                "username": "",
+                "password": "",
+                "repo" :"",
+                "graph": ""
+            }
+        },
+        {
+            "action": "create-repo",
+            "tgt": {
+                "url":"",
+                "username": "",
+                "password": "",
+                "repo" :""
+            }
+        },
+        {
+            "action": "import-graph",
+            "tgt": {
+                "url":"",
+                "username": "",
+                "password": "",
+                "repo" :"",
+                "graph": ""
+            }
+        },
+        {
+            "action": "rename-repo",
+            "tgt": {
+                "url":"",
+                "username": "",
+                "password": "",
+                "repo_old": "",
+                "repo_new": ""
+            }
+        },
+        {
+            "action": "rename-graph",
+            "tgt": {
+                "url":"",
+                "username": "",
+                "password": "",
+                "repo" :"",
+                "graph_old": "",
+                "graph_new": ""
+            }
+        }
+    ]
+}

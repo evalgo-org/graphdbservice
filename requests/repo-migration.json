@@ -1,0 +1,20 @@
+{
+    "version": "v0.0.1",
+    "tasks": [
+        {
+            "action": "repo-migration",
+            "src": {
+                "url":"",
+                "username": "",
+                "password": "",
+                "repo": ""
+            },
+            "tgt": {
+                "url":"",
+                "username": "",
+                "password": "",
+                "repo" :""
+            }
+        }
+    ]
+}

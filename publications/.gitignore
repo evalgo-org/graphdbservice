@@ -1,8 +1,0 @@
-.env
-*.env
-tmp_repo
-.netrc
-pip.conf
-pxpim-graph-etl
-publications.consumer.json
-*.egg-info

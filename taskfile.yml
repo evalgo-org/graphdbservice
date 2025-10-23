@@ -1,107 +1,16 @@
 version: '3'
 
+vars:
+  GRAPHDB_VERS: 10.8.5 # use only 10.x.x versions otherwise you will have license issues, for testing that is totally fine
+
 tasks:
-  setup:
+  default:
     cmds:
-      - docker pull ghcr.io/dask/dask:2025.1.0-py3.12
-      - docker network create dask | true
-      - docker run -d --restart always --network dask --name dask-sched ghcr.io/dask/dask:2025.1.0-py3.12 dask scheduler
-      - docker run -d --restart always --network dask --name dask-worker-1 ghcr.io/dask/dask:2025.1.0-py3.12 dask worker tcp://dask-sched:8786
-      - docker run -d --restart always --network dask --name dask-worker-2 ghcr.io/dask/dask:2025.1.0-py3.12 dask worker tcp://dask-sched:8786
-      - docker run -d --restart always --network dask --name dask-worker-3 ghcr.io/dask/dask:2025.1.0-py3.12 dask worker tcp://dask-sched:8786
-      - docker run -d --restart always --network dask --name dask-worker-4 ghcr.io/dask/dask:2025.1.0-py3.12 dask worker tcp://dask-sched:8786
-  down:
+      - echo "pxgraphdb service"
+  local-setup:
     cmds:
-      - docker stop dask-worker-4
-      - docker stop dask-worker-3
-      - docker stop dask-worker-2
-      - docker stop dask-worker-1
-      - docker stop dask-sched
-      - docker rm dask-worker-4
-      - docker rm dask-worker-3
-      - docker rm dask-worker-2
-      - docker rm dask-worker-1
-      - docker rm dask-sched
-  run:
-    cmds:
-      - poetry run python parallel.py
-  import:
-    cmds:
-      - docker network create test-ontotext-graphdb || true
-      - docker volume create test-ontotext-graphdb-import
-      - >
-        docker run -d 
-        -v test-ontotext-graphdb-import:/opt/graphdb/home 
-        --name test-ontotext-graphdb-import 
-        --network test-ontotext-graphdb 
-        -p 7201:7200 
-        -e GRAPHDB_PARENT_DIR=/opt/graphdb 
-        -e GRAPHDB_HOME=/opt/graphdb/home 
-        -e GRAPHDB_INSTALL_DIR=/opt/graphdb/dist 
-        ontotext/graphdb:10.6.3 -Dgraphdb.home=/opt/graphdb/home -Dgraphdb.workbench.maxUploadSize=1024000000
-  export_1:
-    cmds:
-      - docker network create test-ontotext-graphdb || true
-      - docker volume create test-ontotext-graphdb-export-1
-      - >
-        docker run -d 
-        -v test-ontotext-graphdb-export-1:/opt/graphdb/home 
-        --name test-ontotext-graphdb-export-1 
-        --network test-ontotext-graphdb 
-        -p 7202:7200 
-        -e GRAPHDB_PARENT_DIR=/opt/graphdb 
-        -e GRAPHDB_HOME=/opt/graphdb/home 
-        -e GRAPHDB_INSTALL_DIR=/opt/graphdb/dist 
-        ontotext/graphdb:10.6.3 -Dgraphdb.home=/opt/graphdb/home -Dgraphdb.workbench.maxUploadSize=1024000000
-  export_2:
-    cmds:
-      - docker network create test-ontotext-graphdb || true
-      - docker volume create test-ontotext-graphdb-export-2
-      - >
-        docker run -d 
-        -v test-ontotext-graphdb-export-2:/opt/graphdb/home 
-        --name test-ontotext-graphdb-export-2 
-        --network test-ontotext-graphdb 
-        -p 7203:7200 
-        -e GRAPHDB_PARENT_DIR=/opt/graphdb 
-        -e GRAPHDB_HOME=/opt/graphdb/home 
-        -e GRAPHDB_INSTALL_DIR=/opt/graphdb/dist 
-        ontotext/graphdb:10.6.3 -Dgraphdb.home=/opt/graphdb/home -Dgraphdb.workbench.maxUploadSize=1024000000
-  multi_test:
-    cmds:
-      - task: import
-      - task: export_1
-      - task: export_2
-  multi_clean:
-    cmds:
-      - docker stop test-ontotext-graphdb-import test-ontotext-graphdb-export-1 test-ontotext-graphdb-export-2
-      - docker rm test-ontotext-graphdb-import test-ontotext-graphdb-export-1 test-ontotext-graphdb-export-2
-      - docker volume rm test-ontotext-graphdb-import test-ontotext-graphdb-export-1 test-ontotext-graphdb-export-2
-      - docker network rm test-ontotext-graphdb
-  graphdb-single:
-    cmds:
-      - docker network create test-ontotext-graphdb-single || true
-      - docker volume create test-ontotext-graphdb-single
-      - >
-        docker run -d 
-        -v test-ontotext-graphdb--single:/opt/graphdb/home 
-        --name test-ontotext-graphdb-single 
-        --network test-ontotext-graphdb-single 
-        -p 7200:7200 
-        -e GRAPHDB_PARENT_DIR=/opt/graphdb 
-        -e GRAPHDB_HOME=/opt/graphdb/home 
-        -e GRAPHDB_INSTALL_DIR=/opt/graphdb/dist 
-        ontotext/graphdb:10.6.3 -Dgraphdb.home=/opt/graphdb/home -Dgraphdb.workbench.maxUploadSize=1024000000
-  clean-graphdb-single:
-    cmds:
-      - docker stop test-ontotext-graphdb-single
-      - docker rm test-ontotext-graphdb-single
-      - docker volume rm test-ontotext-graphdb-single
-      - docker network rm test-ontotext-graphdb-single
-  multi_run:
-    cmds:
-      - poetry run pytest -s .\tests\test_import_multi_export.py
-  app:
-    cmds:
-      - time poetry run python app.py
-  
+      - docker pull ontotext/graphdb:{{.GRAPHDB_VERS}}
+      - docker rm -f test-src-graphdb || true
+      - docker rm -f test-tgt-graphdb || true
+      - docker run -d --name test-src-graphdb -p 7201:7200 ontotext/graphdb:{{.GRAPHDB_VERS}}
+      - docker run -d --name test-tgt-graphdb -p 7202:7200 ontotext/graphdb:{{.GRAPHDB_VERS}}
