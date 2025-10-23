@@ -384,7 +384,10 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 
 	switch task.Action {
 	case "repo-migration":
-		srcGraphDB := db.GraphDBRepositories(task.Src.URL, task.Src.Username, task.Src.Password)
+		srcGraphDB,err := db.GraphDBRepositories(task.Src.URL, task.Src.Username, task.Src.Password)
+		if err != nil {
+			return nil, err
+		}
 		foundRepo := false
 		confFile := ""
 		dataFile := ""
@@ -398,7 +401,10 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		if !foundRepo {
 			return nil, errors.New("could not find required src repository " + task.Src.Repo)
 		}
-		tgtGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		tgtGraphDB,err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		if err != nil {
+			return nil, err
+		}
 		for _, bind := range tgtGraphDB.Results.Bindings {
 			if bind.Id["value"] == task.Src.Repo {
 				err := db.GraphDBDeleteRepository(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Src.Repo)
@@ -407,7 +413,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 				}
 			}
 		}
-		err := db.GraphDBRestoreConf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, confFile)
+		err = db.GraphDBRestoreConf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, confFile)
 		if err != nil {
 			return nil, err
 		}
@@ -422,7 +428,10 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		result["tgt_repo"] = task.Tgt.Repo
 
 	case "graph-migration":
-		srcGraphDB := db.GraphDBRepositories(task.Src.URL, task.Src.Username, task.Src.Password)
+		srcGraphDB,err := db.GraphDBRepositories(task.Src.URL, task.Src.Username, task.Src.Password)
+		if err != nil {
+			return nil, err
+		}
 		foundRepo := false
 		graphFile := md5Hash(task.Src.Graph) + ".brf"
 		for _, bind := range srcGraphDB.Results.Bindings {
@@ -451,7 +460,10 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 			return nil, errors.New("could not find required src repository " + task.Src.Repo)
 		}
 
-		tgtGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		tgtGraphDB,err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		if err != nil {
+			return nil, err
+		}
 		foundRepo = false
 		for _, bind := range tgtGraphDB.Results.Bindings {
 			if bind.Id["value"] == task.Tgt.Repo {
@@ -483,7 +495,10 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		result["tgt_graph"] = task.Tgt.Graph
 
 	case "repo-delete":
-		tgtGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		tgtGraphDB,err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		if err != nil {
+			return nil, err
+		}
 		for _, bind := range tgtGraphDB.Results.Bindings {
 			if bind.Id["value"] == task.Tgt.Repo {
 				err := db.GraphDBDeleteRepository(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
@@ -516,7 +531,10 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		repoName := task.Tgt.Repo
 		
 		// Check if repository already exists
-		existingRepos := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		existingRepos,err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		if err != nil {
+			return nil, err
+		}
 		for _, bind := range existingRepos.Results.Bindings {
 			if bind.Id["value"] == repoName {
 				return nil, fmt.Errorf("repository '%s' already exists", repoName)
@@ -576,7 +594,10 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		}
 		
 		// Verify the repository was created
-		verifyRepos := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		verifyRepos,err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		if err != nil {
+			return nil, err
+		}
 		repoCreated := false
 		for _, bind := range verifyRepos.Results.Bindings {
 			if bind.Id["value"] == repoName {
@@ -596,8 +617,8 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 	case "graph-import":
 		fmt.Println("DEBUG: Starting graph-import processing")
 		
-		tgtGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
-		if tgtGraphDB == nil {
+		tgtGraphDB,err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		if err != nil {
 			return nil, fmt.Errorf("failed to connect to GraphDB at %s", task.Tgt.URL)
 		}
 		
@@ -744,7 +765,10 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		newRepoName := task.Tgt.RepoNew
 		
 		// Step 1: Check if source repository exists
-		srcGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		srcGraphDB,err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		if err != nil {
+			return nil, err
+		}
 		foundRepo := false
 		for _, bind := range srcGraphDB.Results.Bindings {
 			if bind.Id["value"] == oldRepoName {
@@ -892,7 +916,10 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		repoName := task.Tgt.Repo
 		
 		// Step 1: Check if repository exists
-		tgtGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		tgtGraphDB,err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		if err != nil {
+			return nil, err
+		}
 		foundRepo := false
 		for _, bind := range tgtGraphDB.Results.Bindings {
 			if bind.Id["value"] == repoName {
