@@ -1,0 +1,22 @@
+{
+    "version": "v0.0.1",
+    "tasks": [
+        {
+            "action": "graph-migration",
+            "src": {
+                "url":"",
+                "username": "",
+                "password": "",
+                "repo": "",
+                "graph": ""
+            },
+            "tgt": {
+                "url":"",
+                "username": "",
+                "password": "",
+                "repo" :"",
+                "graph": ""
+            }
+        }
+    ]
+}

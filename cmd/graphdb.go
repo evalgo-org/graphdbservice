@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	 "crypto/md5"
 
 	// eve "eve.evalgo.org/common"
 	"eve.evalgo.org/db"
@@ -39,6 +40,11 @@ type Repository struct {
 	RepoNew  string `json:"repo_new,omitempty"`
 	GraphOld string `json:"graph_old,omitempty"`
 	GraphNew string `json:"graph_new,omitempty"`
+}
+
+func md5Hash(text string) string {
+    hash := md5.Sum([]byte(text))
+    return fmt.Sprintf("%x", hash)
 }
 
 // API Key validation middleware
@@ -88,7 +94,7 @@ func migrationHandler(c echo.Context) error {
 	for i, task := range req.Tasks {
 		result, err := processTask(task)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "Task %d failed: %s", i, err.Error())
+			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Task %d failed: %s", i, err.Error()))
 		}
 		results[i] = result
 	}
@@ -187,11 +193,71 @@ func processTask(task Task) (map[string]interface{}, error) {
 		result["tgt_graph"] = task.Tgt.Graph
 
 	case "graph-migration":
+		srcGraphDB := db.GraphDBRepositories(task.Src.URL, task.Src.Username, task.Src.Password)
+		foundRepo := false
+		graphFile := md5Hash(task.Src.Graph) + ".brf"
+		for _, bind := range srcGraphDB.Results.Bindings {
+			if bind.Id["value"] == task.Src.Repo {
+				foundRepo = true
+				srcGraphDB, err := db.GraphDBListGraphs(task.Src.URL, task.Src.Username, task.Src.Password, task.Src.Repo)
+				if err != nil {
+					return nil, err
+				}
+				foundGraph := false
+				for _, bind := range srcGraphDB.Results.Bindings {
+					if bind.ContextID.Value == task.Tgt.Graph {
+						foundGraph = true
+						err := db.GraphDBExportGraphRdf(task.Src.URL, task.Src.Username, task.Src.Password, task.Src.Repo, task.Src.Graph, graphFile)
+						if err != nil {
+							return nil, err
+						}
+					}
+				}
+				if !foundGraph {
+					return nil, errors.New("could not find required src graph " + task.Src.Graph + " in repository " + task.Src.Repo)
+				}
+			}
+		}
+		if !foundRepo {
+			return nil, errors.New("could not find required src repository " + task.Src.Repo)
+		}
+
+		tgtGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		foundRepo = false
+		for _, bind := range tgtGraphDB.Results.Bindings {
+			if bind.Id["value"] == task.Tgt.Repo {
+				foundRepo = true
+				tgtGraphDB, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
+				if err != nil {
+					return nil, err
+				}
+				foundGraph := false
+				for _, bind := range tgtGraphDB.Results.Bindings {
+					if bind.ContextID.Value == task.Tgt.Graph {
+						foundGraph = true
+						err := db.GraphDBDeleteGraph(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph)
+						if err != nil {
+							return nil, err
+						}
+						err = db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph, graphFile)
+						if err != nil {
+							return nil, err
+						}
+					}
+				}
+				if !foundGraph {
+					return nil, errors.New("could not find required tgt graph " + task.Tgt.Graph + " in repository " + task.Tgt.Repo)
+				}
+			}
+		}
+		fmt.Println("foundRepo", foundRepo)
+		if !foundRepo {
+			return nil, errors.New("could not find required tgt repository " + task.Tgt.Repo)
+		}
 
 		result["message"] = "Graph migrated successfully"
 		result["src_graph"] = task.Src.Graph
 		result["tgt_graph"] = task.Tgt.Graph
-
 	case "repo-delete":
 		tgtGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
 		for _, bind := range tgtGraphDB.Results.Bindings {
