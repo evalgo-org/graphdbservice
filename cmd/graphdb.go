@@ -680,7 +680,9 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		
 		// Try to list graphs (this might fail if repository doesn't exist)
 		fmt.Printf("DEBUG: Listing graphs in repository: %s\n", task.Tgt.Repo)
+		fmt.Println("232","fooooo", task.Tgt)
 		graphsResponse, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
+		fmt.Println("233",err)
 		if err != nil {
 			fmt.Printf("WARNING: Failed to list graphs (repository might not exist): %v\n", err)
 			// Continue with import - we'll try to import anyway
@@ -764,22 +766,11 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 						// Determine import method based on file extension
 						filename := strings.ToLower(fileHeader.Filename)
 						
-						if strings.HasSuffix(filename, ".brf") {
-							// Binary RDF file - use restore method
-							fmt.Printf("DEBUG: Importing binary RDF file: %s\n", fileHeader.Filename)
-							err = db.GraphDBRestoreBrf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, tempFileName)
-							if err != nil {
-								fmt.Printf("ERROR: Failed to import binary RDF file %s: %v\n", fileHeader.Filename, err)
-								return
-							}
-						} else {
-							// Text-based RDF file - use standard import
-							fmt.Printf("DEBUG: Importing text RDF file: %s\n", fileHeader.Filename)
-							err = db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph, tempFileName)
-							if err != nil {
-								fmt.Printf("ERROR: Failed to import RDF file %s: %v\n", fileHeader.Filename, err)
-								return
-							}
+						fmt.Printf("DEBUG: Importing text RDF file: %s\n", fileHeader.Filename)
+						err = db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph, tempFileName)
+						if err != nil {
+							fmt.Printf("ERROR: Failed to import RDF file %s: %v\n", fileHeader.Filename, err)
+							return
 						}
 						
 						fmt.Printf("DEBUG: Successfully imported file: %s\n", fileHeader.Filename)
