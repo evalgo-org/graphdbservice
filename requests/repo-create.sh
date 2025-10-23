@@ -1,5 +1,8 @@
+API_KEY=1234567890
+API_URL=http://localhost:8081
+
 curl -X POST \
-  -H "x-api-key: 1234567890" \
+  -H "x-api-key: ${API_KEY}" \
   -F 'request={"version":"v0.0.1","tasks":[{"action":"repo-create","tgt":{"url":"http://build-003.graphdb.px:7200","username":"","password":"","repo":"autocreated"}}]}' \
   -F "task_0_config=@repo-config.ttl" \
-  http://localhost:8081/v1/api/action
+  ${API_URL}/v1/api/action
