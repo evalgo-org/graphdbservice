@@ -1,0 +1,14 @@
+{
+    "version": "v0.0.1",
+    "tasks": [{
+      "action": "graph-rename",
+      "tgt": {
+        "url": "http://localhost:7200",
+        "username": "admin",
+        "password": "admin",
+        "repo": "my-repository",
+        "graph_old": "http://example.org/old-graph",
+        "graph_new": "http://example.org/new-graph"
+      }
+    }]
+}

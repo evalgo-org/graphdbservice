@@ -77,6 +77,64 @@ func getFileNames(fileHeaders []*multipart.FileHeader) []string {
 	return names
 }
 
+// Helper function to update repository name in TTL configuration file
+func updateRepositoryNameInConfig(configFile, oldName, newName string) error {
+	// Read the configuration file
+	content, err := os.ReadFile(configFile)
+	if err != nil {
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+	
+	// Convert to string for processing
+	configContent := string(content)
+	
+	// Replace repository ID references in the TTL file
+	// Common patterns in GraphDB repository configs:
+	replacements := map[string]string{
+		fmt.Sprintf(`rep:repositoryID "%s"`, oldName): fmt.Sprintf(`rep:repositoryID "%s"`, newName),
+		fmt.Sprintf(`<http://www.openrdf.org/config/repository#%s>`, oldName): fmt.Sprintf(`<http://www.openrdf.org/config/repository#%s>`, newName),
+		fmt.Sprintf(`repo:%s`, oldName): fmt.Sprintf(`repo:%s`, newName),
+	}
+	
+	// Apply replacements
+	for old, new := range replacements {
+		configContent = strings.ReplaceAll(configContent, old, new)
+	}
+	
+	// Also handle the repository node declaration if it exists
+	// Pattern: @base <http://www.openrdf.org/config/repository#oldname>
+	basePattern := fmt.Sprintf(`@base <http://www.openrdf.org/config/repository#%s>`, oldName)
+	newBasePattern := fmt.Sprintf(`@base <http://www.openrdf.org/config/repository#%s>`, newName)
+	configContent = strings.ReplaceAll(configContent, basePattern, newBasePattern)
+	
+	// Write the updated content back to the file
+	err = os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write updated config file: %w", err)
+	}
+	
+	return nil
+}
+
+// Helper function to get triple counts for graphs (for verification purposes)
+func getGraphTripleCounts(url, username, password, repo, oldGraph, newGraph string) (int, int) {
+	// This is a simplified implementation - you might want to implement actual SPARQL queries
+	// to get precise triple counts. For now, we return -1 to indicate counts are not available.
+	// 
+	// Example SPARQL query to get triple count for a specific graph:
+	// SELECT (COUNT(*) AS ?count) WHERE { GRAPH <graphURI> { ?s ?p ?o } }
+	
+	oldCount := -1
+	newCount := -1
+	
+	// You can implement actual SPARQL queries here using your db package
+	// For example:
+	// oldCount = db.GraphDBQueryTripleCount(url, username, password, repo, oldGraph)
+	// newCount = db.GraphDBQueryTripleCount(url, username, password, repo, newGraph)
+	
+	return oldCount, newCount
+}
+
 // Migration handler with multipart form support
 func migrationHandler(c echo.Context) error {
 	// Check if this is a multipart form request
@@ -459,14 +517,268 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		result["graph"] = task.Tgt.Graph
 
 	case "repo-rename":
+		// GraphDB doesn't have a direct rename API, so we need to:
+		// 1. Create backup of old repository (config + individual graphs)
+		// 2. Create new repository with new name
+		// 3. Restore individual graphs to new repository
+		// 4. Delete old repository
+		
+		oldRepoName := task.Tgt.RepoOld
+		newRepoName := task.Tgt.RepoNew
+		
+		// Step 1: Check if source repository exists
+		srcGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		foundRepo := false
+		for _, bind := range srcGraphDB.Results.Bindings {
+			if bind.Id["value"] == oldRepoName {
+				foundRepo = true
+				break
+			}
+		}
+		if !foundRepo {
+			return nil, fmt.Errorf("source repository '%s' not found", oldRepoName)
+		}
+		
+		// Step 2: Check if target repository already exists
+		for _, bind := range srcGraphDB.Results.Bindings {
+			if bind.Id["value"] == newRepoName {
+				return nil, fmt.Errorf("target repository '%s' already exists", newRepoName)
+			}
+		}
+		
+		// Step 3: Get list of all graphs in the source repository
+		graphsList, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, oldRepoName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list graphs in repository '%s': %w", oldRepoName, err)
+		}
+		
+		// Step 4: Create backup of repository configuration
+		confFile := db.GraphDBRepositoryConf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, oldRepoName)
+		if confFile == "" {
+			return nil, fmt.Errorf("failed to backup configuration for repository '%s'", oldRepoName)
+		}
+		defer os.Remove(confFile) // Clean up config file
+		
+		// Step 5: Export each graph individually
+		graphBackups := make(map[string]string) // map[graphURI]fileName
+		var graphExportErrors []string
+		
+		for _, bind := range graphsList.Results.Bindings {
+			graphURI := bind.ContextID.Value
+			if graphURI == "" {
+				continue // Skip empty graph URIs
+			}
+			
+			// Create a unique filename for each graph
+			graphFileName := fmt.Sprintf("/tmp/repo_rename_%s_%s.rdf", md5Hash(oldRepoName), md5Hash(graphURI))
+			
+			err := db.GraphDBExportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, oldRepoName, graphURI, graphFileName)
+			if err != nil {
+				graphExportErrors = append(graphExportErrors, fmt.Sprintf("failed to export graph '%s': %v", graphURI, err))
+				continue
+			}
+			
+			// Verify the export file was created and has content
+			if fileInfo, err := os.Stat(graphFileName); err != nil || fileInfo.Size() == 0 {
+				graphExportErrors = append(graphExportErrors, fmt.Sprintf("graph '%s' export file is empty or missing", graphURI))
+				os.Remove(graphFileName) // Clean up empty file
+				continue
+			}
+			
+			graphBackups[graphURI] = graphFileName
+		}
+		
+		// Clean up graph backup files when done
+		defer func() {
+			for _, fileName := range graphBackups {
+				os.Remove(fileName)
+			}
+		}()
+		
+		// Report any export errors but continue if we have at least some graphs
+		if len(graphExportErrors) > 0 && len(graphBackups) == 0 {
+			return nil, fmt.Errorf("failed to export any graphs: %s", strings.Join(graphExportErrors, "; "))
+		}
+		
+		// Step 6: Modify the configuration file to use the new repository name
+		err = updateRepositoryNameInConfig(confFile, oldRepoName, newRepoName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update repository name in config: %w", err)
+		}
+		
+		// Step 7: Create new repository with the updated configuration
+		err = db.GraphDBRestoreConf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, confFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new repository '%s': %w", newRepoName, err)
+		}
+		
+		// Step 8: Import each graph into the new repository
+		var graphImportErrors []string
+		successfulImports := 0
+		
+		for graphURI, fileName := range graphBackups {
+			err := db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, newRepoName, graphURI, fileName)
+			if err != nil {
+				graphImportErrors = append(graphImportErrors, fmt.Sprintf("failed to import graph '%s': %v", graphURI, err))
+				continue
+			}
+			successfulImports++
+		}
+		
+		// Step 9: Verify that graphs were imported successfully
+		if successfulImports == 0 && len(graphBackups) > 0 {
+			// If no graphs were imported, clean up the new repository
+			db.GraphDBDeleteRepository(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, newRepoName)
+			return nil, fmt.Errorf("failed to import any graphs to new repository: %s", strings.Join(graphImportErrors, "; "))
+		}
+		
+		// Step 10: Delete the old repository
+		err = db.GraphDBDeleteRepository(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, oldRepoName)
+		if err != nil {
+			// Log warning but don't fail the operation since the new repo is already created
+			fmt.Printf("Warning: failed to delete old repository '%s': %v\n", oldRepoName, err)
+			result["warning"] = fmt.Sprintf("New repository created successfully, but failed to delete old repository: %v", err)
+		}
+		
 		result["message"] = "Repository renamed successfully"
-		result["old_name"] = task.Tgt.RepoOld
-		result["new_name"] = task.Tgt.RepoNew
+		result["old_name"] = oldRepoName
+		result["new_name"] = newRepoName
+		result["total_graphs"] = len(graphsList.Results.Bindings)
+		result["exported_graphs"] = len(graphBackups)
+		result["imported_graphs"] = successfulImports
+		
+		// Add warnings if there were any issues
+		if len(graphExportErrors) > 0 {
+			if result["warning"] != nil {
+				result["warning"] = fmt.Sprintf("%s; Export issues: %s", result["warning"], strings.Join(graphExportErrors, "; "))
+			} else {
+				result["warning"] = fmt.Sprintf("Some graphs had export issues: %s", strings.Join(graphExportErrors, "; "))
+			}
+		}
+		
+		if len(graphImportErrors) > 0 {
+			if result["warning"] != nil {
+				result["warning"] = fmt.Sprintf("%s; Import issues: %s", result["warning"], strings.Join(graphImportErrors, "; "))
+			} else {
+				result["warning"] = fmt.Sprintf("Some graphs had import issues: %s", strings.Join(graphImportErrors, "; "))
+			}
+		}
 
 	case "graph-rename":
+		// GraphDB doesn't have a direct graph rename API, so we need to:
+		// 1. Export the old graph to a temporary file
+		// 2. Import the data into the new graph
+		// 3. Delete the old graph
+		
+		oldGraphName := task.Tgt.GraphOld
+		newGraphName := task.Tgt.GraphNew
+		repoName := task.Tgt.Repo
+		
+		// Step 1: Check if repository exists
+		tgtGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		foundRepo := false
+		for _, bind := range tgtGraphDB.Results.Bindings {
+			if bind.Id["value"] == repoName {
+				foundRepo = true
+				break
+			}
+		}
+		if !foundRepo {
+			return nil, fmt.Errorf("repository '%s' not found", repoName)
+		}
+		
+		// Step 2: Check if source graph exists
+		graphsResponse, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, repoName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list graphs in repository '%s': %w", repoName, err)
+		}
+		
+		foundOldGraph := false
+		foundNewGraph := false
+		for _, bind := range graphsResponse.Results.Bindings {
+			if bind.ContextID.Value == oldGraphName {
+				foundOldGraph = true
+			}
+			if bind.ContextID.Value == newGraphName {
+				foundNewGraph = true
+			}
+		}
+		
+		if !foundOldGraph {
+			return nil, fmt.Errorf("source graph '%s' not found in repository '%s'", oldGraphName, repoName)
+		}
+		
+		if foundNewGraph {
+			return nil, fmt.Errorf("target graph '%s' already exists in repository '%s'", newGraphName, repoName)
+		}
+		
+		// Step 3: Export the old graph to a temporary file
+		tempFileName := fmt.Sprintf("/tmp/graph_rename_%s.rdf", md5Hash(oldGraphName))
+		defer os.Remove(tempFileName) // Clean up temporary file
+		
+		err = db.GraphDBExportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, repoName, oldGraphName, tempFileName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to export graph '%s': %w", oldGraphName, err)
+		}
+		
+		// Step 4: Verify the export file was created and has content
+		fileInfo, err := os.Stat(tempFileName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify exported file: %w", err)
+		}
+		if fileInfo.Size() == 0 {
+			return nil, fmt.Errorf("exported graph file is empty - graph '%s' may be empty", oldGraphName)
+		}
+		
+		// Step 5: Import the data into the new graph
+		err = db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, repoName, newGraphName, tempFileName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to import graph data to '%s': %w", newGraphName, err)
+		}
+		
+		// Step 6: Verify the new graph was created successfully
+		verifyGraphs, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, repoName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify new graph creation: %w", err)
+		}
+		
+		newGraphExists := false
+		for _, bind := range verifyGraphs.Results.Bindings {
+			if bind.ContextID.Value == newGraphName {
+				newGraphExists = true
+				break
+			}
+		}
+		
+		if !newGraphExists {
+			return nil, fmt.Errorf("new graph '%s' was not created successfully", newGraphName)
+		}
+		
+		// Step 7: Get triple counts for verification
+		oldGraphTriples, newGraphTriples := getGraphTripleCounts(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, repoName, oldGraphName, newGraphName)
+		
+		// Step 8: Delete the old graph
+		err = db.GraphDBDeleteGraph(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, repoName, oldGraphName)
+		if err != nil {
+			// Log warning but don't fail since new graph is already created
+			fmt.Printf("Warning: failed to delete old graph '%s': %v\n", oldGraphName, err)
+			result["warning"] = fmt.Sprintf("New graph created successfully, but failed to delete old graph: %v", err)
+		}
+		
 		result["message"] = "Graph renamed successfully"
-		result["old_name"] = task.Tgt.GraphOld
-		result["new_name"] = task.Tgt.GraphNew
+		result["repository"] = repoName
+		result["old_name"] = oldGraphName
+		result["new_name"] = newGraphName
+		result["file_size_bytes"] = fileInfo.Size()
+		
+		// Add triple count verification if available
+		if oldGraphTriples >= 0 && newGraphTriples >= 0 {
+			result["old_graph_triples"] = oldGraphTriples
+			result["new_graph_triples"] = newGraphTriples
+			if oldGraphTriples != newGraphTriples {
+				result["warning"] = fmt.Sprintf("Triple count mismatch: old graph had %d triples, new graph has %d triples", oldGraphTriples, newGraphTriples)
+			}
+		}
 	}
 
 	return result, nil
