@@ -423,24 +423,85 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		result["graph"] = task.Tgt.Graph
 
 	case "repo-create":
-		// Handle optional repository configuration files
-		if files != nil {
-			fileKey := fmt.Sprintf("task_%d_config", taskIndex)
-			if taskFiles, exists := files[fileKey]; exists {
-				result["config_files"] = getFileNames(taskFiles)
-				// Process config files if needed
-				for _, fileHeader := range taskFiles {
-					file, err := fileHeader.Open()
-					if err != nil {
-						return nil, fmt.Errorf("failed to open config file %s: %w", fileHeader.Filename, err)
-					}
-					defer file.Close()
-					// TODO: Process repository configuration file
-				}
+		repoName := task.Tgt.Repo
+		
+		// Check if repository already exists
+		existingRepos := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		for _, bind := range existingRepos.Results.Bindings {
+			if bind.Id["value"] == repoName {
+				return nil, fmt.Errorf("repository '%s' already exists", repoName)
 			}
 		}
+		
+		// Require configuration file upload
+		if files == nil {
+			return nil, fmt.Errorf("repo-create requires a configuration file to be uploaded")
+		}
+		
+		fileKey := fmt.Sprintf("task_%d_config", taskIndex)
+		taskFiles, exists := files[fileKey]
+		if !exists || len(taskFiles) == 0 {
+			return nil, fmt.Errorf("repo-create requires a configuration file with key 'task_%d_config'", taskIndex)
+		}
+		
+		// Use the first uploaded configuration file
+		fileHeader := taskFiles[0]
+		
+		file, err := fileHeader.Open()
+		if err != nil {
+			return nil, fmt.Errorf("failed to open config file %s: %w", fileHeader.Filename, err)
+		}
+		defer file.Close()
+		
+		// Save uploaded config to temporary file
+		configFile := fmt.Sprintf("/tmp/repo_create_%s_%s", md5Hash(repoName), fileHeader.Filename)
+		defer os.Remove(configFile)
+		
+		tempFile, err := os.Create(configFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create temp config file: %w", err)
+		}
+		defer tempFile.Close()
+		
+		// Copy uploaded file to temp file
+		if _, err := file.Seek(0, 0); err != nil {
+			return nil, fmt.Errorf("failed to seek config file: %w", err)
+		}
+		if _, err := tempFile.ReadFrom(file); err != nil {
+			return nil, fmt.Errorf("failed to copy config file: %w", err)
+		}
+		tempFile.Close()
+		
+		// Update the repository name in config file to match the requested name
+		err = updateRepositoryNameInConfig(configFile, "PLACEHOLDER", repoName)
+		if err != nil {
+			// Try without replacement if the config file doesn't have placeholders
+			fmt.Printf("Warning: could not update repository name in config: %v\n", err)
+		}
+		
+		// Create the repository using the configuration file
+		err = db.GraphDBRestoreConf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, configFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create repository '%s': %w", repoName, err)
+		}
+		
+		// Verify the repository was created
+		verifyRepos := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		repoCreated := false
+		for _, bind := range verifyRepos.Results.Bindings {
+			if bind.Id["value"] == repoName {
+				repoCreated = true
+				break
+			}
+		}
+		
+		if !repoCreated {
+			return nil, fmt.Errorf("repository '%s' was not created successfully", repoName)
+		}
+		
 		result["message"] = "Repository created successfully"
-		result["repo"] = task.Tgt.Repo
+		result["repo"] = repoName
+		result["config_file"] = fileHeader.Filename
 
 	case "graph-import":
 		tgtGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
