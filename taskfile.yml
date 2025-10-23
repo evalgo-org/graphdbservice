@@ -2,7 +2,7 @@ version: '3'
 
 vars:
   GRAPHDB_VERS: 10.8.5 # use only 10.x.x versions otherwise you will have license issues, for testing that is totally fine
-  VERS: v0.0.2
+  VERS: v0.0.3
 
 tasks:
   default:
