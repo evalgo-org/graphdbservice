@@ -1,0 +1,8 @@
+[variables]
+BINARY_NAME = "graphdb-service"
+
+[phases.build]
+cmds = ["go build -o $BINARY_NAME ."]
+
+[start]
+cmd = "./$BINARY_NAME "

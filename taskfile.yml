@@ -14,3 +14,9 @@ tasks:
       - docker rm -f test-tgt-graphdb || true
       - docker run -d --name test-src-graphdb -p 7201:7200 ontotext/graphdb:{{.GRAPHDB_VERS}}
       - docker run -d --name test-tgt-graphdb -p 7202:7200 ontotext/graphdb:{{.GRAPHDB_VERS}}
+  image-build-local:
+    cmds:
+      - nixpacks build . --name private.hz.pantopix.net/pxgraphdb/service:v0.0.1
+      - docker tag private.hz.pantopix.net/pxgraphdb/service:v0.0.1 private.hz.pantopix.net/pxgraphdb/service:latest
+      - docker push private.hz.pantopix.net/pxgraphdb/service:v0.0.1
+      - docker push private.hz.pantopix.net/pxgraphdb/service:latest
