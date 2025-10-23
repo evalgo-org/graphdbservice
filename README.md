@@ -103,6 +103,7 @@
 ## requests
 ````
 API_KEY=1234567890
+API_URL=https://service-pxgraphdb-dev.cfapps.eu10.hana.ondemand.com
 API_URL=http://service.pxgraphdb.px:8080
 
 SRC_GRAPHDB=http://dev.graphdb.px:7200
@@ -145,10 +146,17 @@ curl -X POST \
     -F "task_0_files=@autocreated.brf" \
     ${API_URL}/v1/api/action
 
-# # graph-import
+# # graph-delete
 curl -X POST \
     -H "X-API-Key: ${API_KEY}" \
-    -F "task_0_files=@6d81da45b5d4e483fdbece2ba950eb6a.brf" \
+    -H "Content-Type: application/json" \
+    -d "{\"version\": \"v0.0.1\",\"tasks\": [{\"action\": \"graph-delete\",\"tgt\": {\"url\":\"${TGT_GRAPHDB}\",\"username\": \"\",\"password\": \"\",\"repo\":\"autocreated\", \"graph\":\"${GRAPH}\"}}]}" \
+    ${API_URL}/v1/api/action
+
+# # graph-import supports only rdf+xml for now
+curl -X POST \
+    -H "X-API-Key: ${API_KEY}" \
+    -F "task_0_files=@statements.rdf" \
     -F "request={\"version\": \"v0.0.1\",\"tasks\": [{\"action\": \"graph-import\",\"tgt\": {\"url\":\"${TGT_GRAPHDB}\",\"username\": \"\",\"password\": \"\",\"repo\":\"autocreated\", \"graph\":\"${GRAPH}\"}}]}" \
     ${API_URL}/v1/api/action
 
