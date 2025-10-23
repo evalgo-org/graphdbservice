@@ -1,14 +1,17 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path"
-	 "crypto/md5"
+	"strings"
+	"crypto/md5"
 
 	// eve "eve.evalgo.org/common"
 	"eve.evalgo.org/db"
@@ -43,8 +46,8 @@ type Repository struct {
 }
 
 func md5Hash(text string) string {
-    hash := md5.Sum([]byte(text))
-    return fmt.Sprintf("%x", hash)
+	hash := md5.Sum([]byte(text))
+	return fmt.Sprintf("%x", hash)
 }
 
 // API Key validation middleware
@@ -65,8 +68,29 @@ func apiKeyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
-// Migration handler
+// Helper function to extract file names from file headers
+func getFileNames(fileHeaders []*multipart.FileHeader) []string {
+	names := make([]string, len(fileHeaders))
+	for i, fh := range fileHeaders {
+		names[i] = fh.Filename
+	}
+	return names
+}
+
+// Migration handler with multipart form support
 func migrationHandler(c echo.Context) error {
+	// Check if this is a multipart form request
+	contentType := c.Request().Header.Get("Content-Type")
+	
+	if contentType != "" && strings.HasPrefix(contentType, "multipart/form-data") {
+		return migrationHandlerMultipart(c)
+	} else {
+		return migrationHandlerJSON(c)
+	}
+}
+
+// Original JSON handler for backward compatibility
+func migrationHandlerJSON(c echo.Context) error {
 	var req MigrationRequest
 
 	if err := c.Bind(&req); err != nil {
@@ -85,20 +109,80 @@ func migrationHandler(c echo.Context) error {
 	// Validate each task
 	for i, task := range req.Tasks {
 		if err := validateTask(task); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "Task %d: %s", i, err.Error())
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Task %d: %s", i, err.Error()))
 		}
 	}
 
-	// Process tasks (implement your business logic here)
+	// Process tasks
 	results := make([]map[string]interface{}, len(req.Tasks))
 	for i, task := range req.Tasks {
-		result, err := processTask(task)
+		result, err := processTask(task, nil, i)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Task %d failed: %s", i, err.Error()))
 		}
 		results[i] = result
 	}
 
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"version": req.Version,
+		"results": results,
+	})
+}
+
+// New multipart form handler
+func migrationHandlerMultipart(c echo.Context) error {
+	// Parse multipart form
+	form, err := c.MultipartForm()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Failed to parse multipart form")
+	}
+	defer form.RemoveAll() // Clean up temporary files
+	
+	// Get JSON request from form field
+	jsonFields, exists := form.Value["request"]
+	if !exists || len(jsonFields) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "Missing 'request' field in form data")
+	}
+	
+	// Parse JSON request
+	var req MigrationRequest
+	if err := json.Unmarshal([]byte(jsonFields[0]), &req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid JSON in request field: "+err.Error())
+	}
+	
+	// Validate request
+	if req.Version == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "Version is required")
+	}
+	
+	if len(req.Tasks) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "At least one task is required")
+	}
+	
+	// Get uploaded files
+	files := make(map[string][]*multipart.FileHeader)
+	for key, fileHeaders := range form.File {
+		files[key] = fileHeaders
+	}
+	
+	// Validate each task
+	for i, task := range req.Tasks {
+		if err := validateTask(task); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Task %d: %s", i, err.Error()))
+		}
+	}
+	
+	// Process tasks with files
+	results := make([]map[string]interface{}, len(req.Tasks))
+	for i, task := range req.Tasks {
+		result, err := processTask(task, files, i)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Task %d failed: %s", i, err.Error()))
+		}
+		results[i] = result
+	}
+	
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"status":  "success",
 		"version": req.Version,
@@ -144,10 +228,7 @@ func validateTask(task Task) error {
 	return nil
 }
 
-func processTask(task Task) (map[string]interface{}, error) {
-	// Implement your actual business logic here
-	// This is a placeholder that returns success for all tasks
-
+func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex int) (map[string]interface{}, error) {
 	result := map[string]interface{}{
 		"action": task.Action,
 		"status": "completed",
@@ -189,8 +270,8 @@ func processTask(task Task) (map[string]interface{}, error) {
 		os.Remove(confFile)
 		os.Remove(dataFile)
 		result["message"] = "Repository migrated successfully"
-		result["src_graph"] = task.Src.Graph
-		result["tgt_graph"] = task.Tgt.Graph
+		result["src_repo"] = task.Src.Repo
+		result["tgt_repo"] = task.Tgt.Repo
 
 	case "graph-migration":
 		srcGraphDB := db.GraphDBRepositories(task.Src.URL, task.Src.Username, task.Src.Password)
@@ -231,33 +312,28 @@ func processTask(task Task) (map[string]interface{}, error) {
 				if err != nil {
 					return nil, err
 				}
-				foundGraph := false
 				for _, bind := range tgtGraphDB.Results.Bindings {
 					if bind.ContextID.Value == task.Tgt.Graph {
-						foundGraph = true
 						err := db.GraphDBDeleteGraph(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph)
-						if err != nil {
-							return nil, err
-						}
-						err = db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph, graphFile)
 						if err != nil {
 							return nil, err
 						}
 					}
 				}
-				if !foundGraph {
-					return nil, errors.New("could not find required tgt graph " + task.Tgt.Graph + " in repository " + task.Tgt.Repo)
+				err = db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph, graphFile)
+				if err != nil {
+					return nil, err
 				}
 			}
 		}
-		fmt.Println("foundRepo", foundRepo)
 		if !foundRepo {
 			return nil, errors.New("could not find required tgt repository " + task.Tgt.Repo)
 		}
-
+		os.Remove(graphFile) // Clean up temporary file
 		result["message"] = "Graph migrated successfully"
 		result["src_graph"] = task.Src.Graph
 		result["tgt_graph"] = task.Tgt.Graph
+
 	case "repo-delete":
 		tgtGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
 		for _, bind := range tgtGraphDB.Results.Bindings {
@@ -270,6 +346,7 @@ func processTask(task Task) (map[string]interface{}, error) {
 		}
 		result["message"] = "Repository deleted successfully"
 		result["repo"] = task.Tgt.Repo
+
 	case "graph-delete":
 		fmt.Println(task.Tgt)
 		tgtGraphDB, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
@@ -288,10 +365,96 @@ func processTask(task Task) (map[string]interface{}, error) {
 		result["graph"] = task.Tgt.Graph
 
 	case "repo-create":
+		// Handle optional repository configuration files
+		if files != nil {
+			fileKey := fmt.Sprintf("task_%d_config", taskIndex)
+			if taskFiles, exists := files[fileKey]; exists {
+				result["config_files"] = getFileNames(taskFiles)
+				// Process config files if needed
+				for _, fileHeader := range taskFiles {
+					file, err := fileHeader.Open()
+					if err != nil {
+						return nil, fmt.Errorf("failed to open config file %s: %w", fileHeader.Filename, err)
+					}
+					defer file.Close()
+					// TODO: Process repository configuration file
+				}
+			}
+		}
 		result["message"] = "Repository created successfully"
 		result["repo"] = task.Tgt.Repo
 
 	case "graph-import":
+		tgtGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
+		foundRepo := false
+		for _, bind := range tgtGraphDB.Results.Bindings {
+			if bind.Id["value"] == task.Tgt.Repo {
+				foundRepo = true
+				tgtGraphDB, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
+				if err != nil {
+					return nil, err
+				}
+				for _, bind := range tgtGraphDB.Results.Bindings {
+					if bind.ContextID.Value == task.Tgt.Graph {
+						err := db.GraphDBDeleteGraph(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph)
+						if err != nil {
+							return nil, err
+						}
+					}
+				}
+
+				// Handle uploaded files for import
+				if files != nil {
+					fileKey := fmt.Sprintf("task_%d_files", taskIndex)
+					if taskFiles, exists := files[fileKey]; exists {
+						result["uploaded_files"] = len(taskFiles)
+						result["file_names"] = getFileNames(taskFiles)
+						
+						// Process each uploaded file for import
+						for i, fileHeader := range taskFiles {
+							file, err := fileHeader.Open()
+							if err != nil {
+								return nil, fmt.Errorf("failed to open file %s: %w", fileHeader.Filename, err)
+							}
+							defer file.Close()
+							
+							// Save file temporarily and import it
+							tempFileName := fmt.Sprintf("/tmp/%s", fileHeader.Filename)
+							tempFile, err := os.Create(tempFileName)
+							if err != nil {
+								return nil, fmt.Errorf("failed to create temp file: %w", err)
+							}
+							defer tempFile.Close()
+							defer os.Remove(tempFileName)
+							
+							// Copy uploaded file to temp file
+							if _, err := file.Seek(0, 0); err != nil {
+								return nil, fmt.Errorf("failed to seek file: %w", err)
+							}
+							if _, err := tempFile.ReadFrom(file); err != nil {
+								return nil, fmt.Errorf("failed to copy file: %w", err)
+							}
+							tempFile.Close()
+							
+							// Import the file using your existing function
+							err = db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph, tempFileName)
+							if err != nil {
+								return nil, fmt.Errorf("failed to import file %s: %w", fileHeader.Filename, err)
+							}
+							
+							result[fmt.Sprintf("file_%d_processed", i)] = fileHeader.Filename
+						}
+					} else {
+						return nil, fmt.Errorf("graph-import action requires files to be uploaded with key 'task_%d_files'", taskIndex)
+					}
+				} else {
+					return nil, fmt.Errorf("graph-import action requires files to be uploaded")
+				}
+			}
+		}
+		if !foundRepo {
+			return nil, errors.New("could not find required tgt repository " + task.Tgt.Repo)
+		}
 		result["message"] = "Graph imported successfully"
 		result["graph"] = task.Tgt.Graph
 
@@ -308,68 +471,6 @@ func processTask(task Task) (map[string]interface{}, error) {
 
 	return result, nil
 }
-
-// url, _ := cmd.Flags().GetString("url")
-// user, _ := cmd.Flags().GetString("user")
-// pass, _ := cmd.Flags().GetString("pass")
-// bkp, _ := cmd.Flags().GetBool("bkp")
-// restore, _ := cmd.Flags().GetBool("restore")
-// importRdfXml, _ := cmd.Flags().GetBool("import")
-// exportRdfXml, _ := cmd.Flags().GetBool("export")
-// restorePath, _ := cmd.Flags().GetString("restore-path")
-// importPath, _ := cmd.Flags().GetString("import-dir")
-// importFile, _ := cmd.Flags().GetString("import-file")
-// deleteGraph, _ := cmd.Flags().GetBool("delete-graph")
-// repo, _ := cmd.Flags().GetString("repo")
-// graph, _ := cmd.Flags().GetString("graph")
-// listGraphs, _ := cmd.Flags().GetBool("list-graphs")
-// if exportRdfXml {
-// 	db.GraphDBExportGraphRdf(url, user, pass, repo, graph, eve.URLToFilePath(graph)+".rdf")
-// 	return
-// }
-// if listGraphs {
-// 	db.GraphDBListGraphs(url, user, pass, repo)
-// 	return
-// }
-// if bkp {
-// 	resp := db.GraphDBRepositories(url, user, pass)
-// 	for _, bind := range resp.Results.Bindings {
-// 		fmt.Println(db.GraphDBRepositoryConf(url, user, pass, bind.Id["value"]))
-// 		fmt.Println(db.GraphDBRepositoryBrf(url, user, pass, bind.Id["value"]))
-// 	}
-// 	return
-// }
-// if restore {
-// 	ttlFiles := listFiles(restorePath, "ttl")
-// 	for _, ttlFile := range ttlFiles {
-// 		fmt.Println("import repo config from", ttlFile)
-// 		db.GraphDBRestoreConf(url, user, pass, ttlFile)
-// 	}
-// 	brfFiles := listFiles(restorePath, "brf")
-// 	for _, brfFile := range brfFiles {
-// 		fmt.Println("import repo data from", brfFile)
-// 		db.GraphDBRestoreBrf(url, user, pass, brfFile)
-// 	}
-// 	return
-// }
-// if deleteGraph {
-// 	fmt.Println("delete repo", repo, "graph", graph)
-// 	db.GraphDBDeleteGraph(url, user, pass, repo, graph)
-// }
-// if importRdfXml {
-// 	if importFile != "" {
-// 		fmt.Println("import repo data from", importFile)
-// 		db.GraphDBImportGraphRdf(url, user, pass, repo, graph, importFile)
-// 		return
-// 	} else {
-// 		rdfFiles := listFiles(importPath, "rdf")
-// 		for _, rdfFile := range rdfFiles {
-// 			fmt.Println("import repo data from", rdfFile)
-// 			db.GraphDBImportGraphRdf(url, user, pass, repo, graph, rdfFile)
-// 		}
-// 	}
-// 	return
-// }
 
 func init() {
 	rootCmd.AddCommand(graphdbCmd)
