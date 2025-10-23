@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 	"crypto/md5"
 
 	// eve "eve.evalgo.org/common"
@@ -166,9 +167,13 @@ func migrationHandler(c echo.Context) error {
 	// Check if this is a multipart form request
 	contentType := c.Request().Header.Get("Content-Type")
 	
+	fmt.Printf("DEBUG: Received request with Content-Type: %s\n", contentType)
+	
 	if contentType != "" && strings.HasPrefix(contentType, "multipart/form-data") {
+		fmt.Println("DEBUG: Routing to multipart handler")
 		return migrationHandlerMultipart(c)
 	} else {
+		fmt.Println("DEBUG: Routing to JSON handler")
 		return migrationHandlerJSON(c)
 	}
 }
@@ -216,24 +221,55 @@ func migrationHandlerJSON(c echo.Context) error {
 
 // New multipart form handler
 func migrationHandlerMultipart(c echo.Context) error {
-	// Parse multipart form
-	form, err := c.MultipartForm()
+	fmt.Println("DEBUG: Starting multipart form processing")
+	
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("PANIC RECOVERED in migrationHandlerMultipart: %v\n", r)
+		}
+	}()
+	
+	// Set multipart form memory limit (32MB default, increase if needed)
+	err := c.Request().ParseMultipartForm(32 << 20) // 32MB
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Failed to parse multipart form")
+		fmt.Printf("ERROR: Failed to parse multipart form: %v\n", err)
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse multipart form: %v", err))
 	}
-	defer form.RemoveAll() // Clean up temporary files
+	
+	fmt.Println("DEBUG: Multipart form parsed successfully")
+	
+	// Parse multipart form
+	form := c.Request().MultipartForm
+	if form == nil {
+		fmt.Println("ERROR: No multipart form data found")
+		return echo.NewHTTPError(http.StatusBadRequest, "No multipart form data found")
+	}
+	defer func() {
+		if form != nil {
+			fmt.Println("DEBUG: Cleaning up multipart form")
+			form.RemoveAll()
+		}
+	}()
+	
+	fmt.Printf("DEBUG: Form has %d value fields and %d file fields\n", len(form.Value), len(form.File))
 	
 	// Get JSON request from form field
 	jsonFields, exists := form.Value["request"]
 	if !exists || len(jsonFields) == 0 {
+		fmt.Println("ERROR: Missing 'request' field in form data")
 		return echo.NewHTTPError(http.StatusBadRequest, "Missing 'request' field in form data")
 	}
+	
+	fmt.Printf("DEBUG: Found request field with %d bytes\n", len(jsonFields[0]))
 	
 	// Parse JSON request
 	var req MigrationRequest
 	if err := json.Unmarshal([]byte(jsonFields[0]), &req); err != nil {
+		fmt.Printf("ERROR: Invalid JSON in request field: %v\n", err)
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid JSON in request field: "+err.Error())
 	}
+	
+	fmt.Printf("DEBUG: Parsed JSON request with %d tasks\n", len(req.Tasks))
 	
 	// Validate request
 	if req.Version == "" {
@@ -260,12 +296,32 @@ func migrationHandlerMultipart(c echo.Context) error {
 	// Process tasks with files
 	results := make([]map[string]interface{}, len(req.Tasks))
 	for i, task := range req.Tasks {
-		result, err := processTask(task, files, i)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Task %d failed: %s", i, err.Error()))
-		}
-		results[i] = result
+		fmt.Printf("DEBUG: Processing task %d: %s\n", i, task.Action)
+		
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Printf("PANIC RECOVERED in task %d processing: %v\n", i, r)
+				}
+			}()
+			
+			result, err := processTask(task, files, i)
+			if err != nil {
+				fmt.Printf("ERROR: Task %d failed: %v\n", i, err)
+				// Don't return error here, capture it in results
+				results[i] = map[string]interface{}{
+					"action": task.Action,
+					"status": "failed",
+					"error":  err.Error(),
+				}
+				return
+			}
+			results[i] = result
+			fmt.Printf("DEBUG: Task %d completed successfully\n", i)
+		}()
 	}
+	
+	fmt.Println("DEBUG: All tasks processed, returning response")
 	
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"status":  "success",
@@ -313,6 +369,14 @@ func validateTask(task Task) error {
 }
 
 func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex int) (map[string]interface{}, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("PANIC RECOVERED in processTask for action %s: %v\n", task.Action, r)
+		}
+	}()
+	
+	fmt.Printf("DEBUG: Processing task action: %s\n", task.Action)
+	
 	result := map[string]interface{}{
 		"action": task.Action,
 		"status": "completed",
@@ -530,17 +594,22 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		result["config_file"] = fileHeader.Filename
 
 	case "graph-import":
+		fmt.Println("DEBUG: Starting graph-import processing")
+		
 		tgtGraphDB := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
 		foundRepo := false
 		for _, bind := range tgtGraphDB.Results.Bindings {
 			if bind.Id["value"] == task.Tgt.Repo {
 				foundRepo = true
+				fmt.Printf("DEBUG: Found target repository: %s\n", task.Tgt.Repo)
+				
 				tgtGraphDB, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
 				if err != nil {
 					return nil, err
 				}
 				for _, bind := range tgtGraphDB.Results.Bindings {
 					if bind.ContextID.Value == task.Tgt.Graph {
+						fmt.Printf("DEBUG: Deleting existing graph: %s\n", task.Tgt.Graph)
 						err := db.GraphDBDeleteGraph(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph)
 						if err != nil {
 							return nil, err
@@ -551,57 +620,87 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 				// Handle uploaded files for import
 				if files != nil {
 					fileKey := fmt.Sprintf("task_%d_files", taskIndex)
+					fmt.Printf("DEBUG: Looking for files with key: %s\n", fileKey)
+					
 					if taskFiles, exists := files[fileKey]; exists {
+						fmt.Printf("DEBUG: Found %d files to import\n", len(taskFiles))
 						result["uploaded_files"] = len(taskFiles)
 						result["file_names"] = getFileNames(taskFiles)
 						
 						// Process each uploaded file for import
 						for i, fileHeader := range taskFiles {
-							file, err := fileHeader.Open()
-							if err != nil {
-								return nil, fmt.Errorf("failed to open file %s: %w", fileHeader.Filename, err)
-							}
-							defer file.Close()
+							fmt.Printf("DEBUG: Processing file %d: %s (size: %d bytes)\n", i, fileHeader.Filename, fileHeader.Size)
 							
-							// Save file temporarily and import it
-							tempFileName := fmt.Sprintf("/tmp/%s", fileHeader.Filename)
-							tempFile, err := os.Create(tempFileName)
-							if err != nil {
-								return nil, fmt.Errorf("failed to create temp file: %w", err)
-							}
-							defer tempFile.Close()
-							defer os.Remove(tempFileName)
-							
-							// Copy uploaded file to temp file
-							if _, err := file.Seek(0, 0); err != nil {
-								return nil, fmt.Errorf("failed to seek file: %w", err)
-							}
-							if _, err := tempFile.ReadFrom(file); err != nil {
-								return nil, fmt.Errorf("failed to copy file: %w", err)
-							}
-							tempFile.Close()
-							
-							// Determine import method based on file extension
-							filename := strings.ToLower(fileHeader.Filename)
-							
-							if strings.HasSuffix(filename, ".brf") {
-								// Binary RDF file - use restore method
-								fmt.Printf("DEBUG: Importing binary RDF file: %s\n", fileHeader.Filename)
-								err = db.GraphDBRestoreBrf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, tempFileName)
+							func() {
+								defer func() {
+									if r := recover(); r != nil {
+										fmt.Printf("PANIC in file processing %s: %v\n", fileHeader.Filename, r)
+									}
+								}()
+								
+								file, err := fileHeader.Open()
 								if err != nil {
-									return nil, fmt.Errorf("failed to import binary RDF file %s: %w", fileHeader.Filename, err)
+									fmt.Printf("ERROR: Failed to open file %s: %v\n", fileHeader.Filename, err)
+									return
 								}
-							} else {
-								// Text-based RDF file - use standard import
-								fmt.Printf("DEBUG: Importing text RDF file: %s\n", fileHeader.Filename)
-								err = db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph, tempFileName)
+								defer file.Close()
+								
+								// Save file temporarily and import it
+								tempFileName := fmt.Sprintf("/tmp/%s", fileHeader.Filename)
+								fmt.Printf("DEBUG: Creating temp file: %s\n", tempFileName)
+								
+								tempFile, err := os.Create(tempFileName)
 								if err != nil {
-									return nil, fmt.Errorf("failed to import RDF file %s: %w", fileHeader.Filename, err)
+									fmt.Printf("ERROR: Failed to create temp file: %v\n", err)
+									return
 								}
-							}
-							
-							result[fmt.Sprintf("file_%d_processed", i)] = fileHeader.Filename
-							result[fmt.Sprintf("file_%d_type", i)] = getFileType(filename)
+								defer tempFile.Close()
+								defer func() {
+									fmt.Printf("DEBUG: Removing temp file: %s\n", tempFileName)
+									os.Remove(tempFileName)
+								}()
+								
+								// Copy uploaded file to temp file
+								if _, err := file.Seek(0, 0); err != nil {
+									fmt.Printf("ERROR: Failed to seek file: %v\n", err)
+									return
+								}
+								
+								fmt.Printf("DEBUG: Copying file content to temp file\n")
+								bytesWritten, err := tempFile.ReadFrom(file)
+								if err != nil {
+									fmt.Printf("ERROR: Failed to copy file: %v\n", err)
+									return
+								}
+								tempFile.Close()
+								
+								fmt.Printf("DEBUG: Copied %d bytes to temp file\n", bytesWritten)
+								
+								// Determine import method based on file extension
+								filename := strings.ToLower(fileHeader.Filename)
+								
+								if strings.HasSuffix(filename, ".brf") {
+									// Binary RDF file - use restore method
+									fmt.Printf("DEBUG: Importing binary RDF file: %s\n", fileHeader.Filename)
+									err = db.GraphDBRestoreBrf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, tempFileName)
+									if err != nil {
+										fmt.Printf("ERROR: Failed to import binary RDF file %s: %v\n", fileHeader.Filename, err)
+										return
+									}
+								} else {
+									// Text-based RDF file - use standard import
+									fmt.Printf("DEBUG: Importing text RDF file: %s\n", fileHeader.Filename)
+									err = db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph, tempFileName)
+									if err != nil {
+										fmt.Printf("ERROR: Failed to import RDF file %s: %v\n", fileHeader.Filename, err)
+										return
+									}
+								}
+								
+								fmt.Printf("DEBUG: Successfully imported file: %s\n", fileHeader.Filename)
+								result[fmt.Sprintf("file_%d_processed", i)] = fileHeader.Filename
+								result[fmt.Sprintf("file_%d_type", i)] = getFileType(filename)
+							}()
 						}
 					} else {
 						return nil, fmt.Errorf("graph-import action requires files to be uploaded with key 'task_%d_files'", taskIndex)
@@ -922,6 +1021,15 @@ var graphdbCmd = &cobra.Command{
 	Long:  `service to integrate with graphdb`,
 	Run: func(cmd *cobra.Command, args []string) {
 		e := echo.New()
+		
+		// Add request size limit (100MB)
+		e.Use(middleware.BodyLimit("100M"))
+		
+		// Add timeout middleware
+		e.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
+			Timeout: 300 * time.Second, // 5 minutes
+		}))
+		
 		// Enable CORS
 		e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 			AllowOrigins: []string{"*"},
