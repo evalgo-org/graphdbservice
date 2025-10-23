@@ -203,7 +203,6 @@ func processTask(task Task) (map[string]interface{}, error) {
 		}
 		result["message"] = "Repository deleted successfully"
 		result["repo"] = task.Tgt.Repo
-
 	case "graph-delete":
 		result["message"] = "Graph deleted successfully"
 		result["graph"] = task.Tgt.Graph

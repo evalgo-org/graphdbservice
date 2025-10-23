@@ -2,6 +2,7 @@ version: '3'
 
 vars:
   GRAPHDB_VERS: 10.8.5 # use only 10.x.x versions otherwise you will have license issues, for testing that is totally fine
+  VERS: v0.0.2
 
 tasks:
   default:
@@ -16,7 +17,7 @@ tasks:
       - docker run -d --name test-tgt-graphdb -p 7202:7200 ontotext/graphdb:{{.GRAPHDB_VERS}}
   image-build-local:
     cmds:
-      - nixpacks build . --name private.hz.pantopix.net/pxgraphdb/service:v0.0.1
-      - docker tag private.hz.pantopix.net/pxgraphdb/service:v0.0.1 private.hz.pantopix.net/pxgraphdb/service:latest
-      - docker push private.hz.pantopix.net/pxgraphdb/service:v0.0.1
+      - nixpacks build . --name private.hz.pantopix.net/pxgraphdb/service:{{.VERS}}
+      - docker tag private.hz.pantopix.net/pxgraphdb/service:{{.VERS}} private.hz.pantopix.net/pxgraphdb/service:latest
+      - docker push private.hz.pantopix.net/pxgraphdb/service:{{.VERS}}
       - docker push private.hz.pantopix.net/pxgraphdb/service:latest
