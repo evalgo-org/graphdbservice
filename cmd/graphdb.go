@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"errors"
-	// "fmt"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -104,12 +104,12 @@ func validateTask(task Task) error {
 	validActions := map[string]bool{
 		"repo-migration":  true,
 		"graph-migration": true,
-		"delete-repo":     true,
-		"delete-graph":    true,
-		"create-repo":     true,
-		"import-graph":    true,
-		"rename-repo":     true,
-		"rename-graph":    true,
+		"repo-delete":     true,
+		"graph-delete":    true,
+		"repo-create":     true,
+		"graph-import":    true,
+		"repo-rename":     true,
+		"graph-rename":    true,
 	}
 
 	if !validActions[task.Action] {
@@ -121,15 +121,15 @@ func validateTask(task Task) error {
 		if task.Src == nil || task.Tgt == nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "Both src and tgt are required for %s", task.Action)
 		}
-	case "delete-repo", "delete-graph", "create-repo", "import-graph":
+	case "repo-delete", "graph-delete", "repo-create", "graph-import":
 		if task.Tgt == nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "tgt is required for %s", task.Action)
 		}
-	case "rename-repo":
+	case "repo-rename":
 		if task.Tgt == nil || task.Tgt.RepoOld == "" || task.Tgt.RepoNew == "" {
 			return echo.NewHTTPError(http.StatusBadRequest, "tgt with repo_old and repo_new are required for rename-repo")
 		}
-	case "rename-graph":
+	case "graph-rename":
 		if task.Tgt == nil || task.Tgt.GraphOld == "" || task.Tgt.GraphNew == "" {
 			return echo.NewHTTPError(http.StatusBadRequest, "tgt with graph_old and graph_new are required for rename-graph")
 		}
@@ -187,6 +187,7 @@ func processTask(task Task) (map[string]interface{}, error) {
 		result["tgt_graph"] = task.Tgt.Graph
 
 	case "graph-migration":
+
 		result["message"] = "Graph migrated successfully"
 		result["src_graph"] = task.Src.Graph
 		result["tgt_graph"] = task.Tgt.Graph
@@ -204,6 +205,19 @@ func processTask(task Task) (map[string]interface{}, error) {
 		result["message"] = "Repository deleted successfully"
 		result["repo"] = task.Tgt.Repo
 	case "graph-delete":
+		fmt.Println(task.Tgt)
+		tgtGraphDB, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
+		if err != nil {
+			return nil, err
+		}
+		for _, bind := range tgtGraphDB.Results.Bindings {
+			if bind.ContextID.Value == task.Tgt.Graph {
+				err := db.GraphDBDeleteGraph(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
 		result["message"] = "Graph deleted successfully"
 		result["graph"] = task.Tgt.Graph
 
