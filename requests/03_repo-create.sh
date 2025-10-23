@@ -1,5 +1,5 @@
 API_KEY=1234567890
-API_URL=http://localhost:8081
+API_URL=http://service.pxgraphdb.px:8080
 
 curl -X POST \
   -H "x-api-key: ${API_KEY}" \

@@ -135,6 +135,32 @@ func getGraphTripleCounts(url, username, password, repo, oldGraph, newGraph stri
 	return oldCount, newCount
 }
 
+// Helper function to determine RDF file type based on extension
+func getFileType(filename string) string {
+	filename = strings.ToLower(filename)
+	
+	switch {
+	case strings.HasSuffix(filename, ".brf"):
+		return "binary-rdf"
+	case strings.HasSuffix(filename, ".rdf") || strings.HasSuffix(filename, ".xml"):
+		return "rdf-xml"
+	case strings.HasSuffix(filename, ".ttl"):
+		return "turtle"
+	case strings.HasSuffix(filename, ".nt"):
+		return "n-triples"
+	case strings.HasSuffix(filename, ".n3"):
+		return "n3"
+	case strings.HasSuffix(filename, ".jsonld") || strings.HasSuffix(filename, ".json"):
+		return "json-ld"
+	case strings.HasSuffix(filename, ".trig"):
+		return "trig"
+	case strings.HasSuffix(filename, ".nq"):
+		return "n-quads"
+	default:
+		return "unknown"
+	}
+}
+
 // Migration handler with multipart form support
 func migrationHandler(c echo.Context) error {
 	// Check if this is a multipart form request
@@ -555,13 +581,27 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 							}
 							tempFile.Close()
 							
-							// Import the file using your existing function
-							err = db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph, tempFileName)
-							if err != nil {
-								return nil, fmt.Errorf("failed to import file %s: %w", fileHeader.Filename, err)
+							// Determine import method based on file extension
+							filename := strings.ToLower(fileHeader.Filename)
+							
+							if strings.HasSuffix(filename, ".brf") {
+								// Binary RDF file - use restore method
+								fmt.Printf("DEBUG: Importing binary RDF file: %s\n", fileHeader.Filename)
+								err = db.GraphDBRestoreBrf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, tempFileName)
+								if err != nil {
+									return nil, fmt.Errorf("failed to import binary RDF file %s: %w", fileHeader.Filename, err)
+								}
+							} else {
+								// Text-based RDF file - use standard import
+								fmt.Printf("DEBUG: Importing text RDF file: %s\n", fileHeader.Filename)
+								err = db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph, tempFileName)
+								if err != nil {
+									return nil, fmt.Errorf("failed to import RDF file %s: %w", fileHeader.Filename, err)
+								}
 							}
 							
 							result[fmt.Sprintf("file_%d_processed", i)] = fileHeader.Filename
+							result[fmt.Sprintf("file_%d_type", i)] = getFileType(filename)
 						}
 					} else {
 						return nil, fmt.Errorf("graph-import action requires files to be uploaded with key 'task_%d_files'", taskIndex)
