@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 	"crypto/md5"
+	"net/url"
 
 	// eve "eve.evalgo.org/common"
 	"eve.evalgo.org/db"
@@ -20,6 +21,10 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+)
+
+var(
+	identityFile string = ""
 )
 
 // Request structures
@@ -380,6 +385,20 @@ func validateTask(task Task) error {
 	return nil
 }
 
+func URL2ServiceRobust(urlStr string) (string, error) {
+	// Add scheme if missing to help url.Parse work correctly
+	if !strings.HasPrefix(urlStr, "http://") && !strings.HasPrefix(urlStr, "https://") {
+		urlStr = "http://" + urlStr
+	}
+	
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return "", err
+	}
+	
+	return parsedURL.Hostname(), nil
+}
+
 func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex int) (map[string]interface{}, error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -387,6 +406,9 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		}
 	}()
 	
+	var srcClient *http.Client = http.DefaultClient
+	var tgtClient *http.Client = http.DefaultClient
+
 	fmt.Printf("DEBUG: Processing task action: %s\n", task.Action)
 	
 	result := map[string]interface{}{
@@ -396,6 +418,25 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 
 	switch task.Action {
 	case "repo-migration":
+		if identityFile != "" {
+			srcURL,err := URL2ServiceRobust(task.Src.URL)
+			if err != nil {
+				return nil, err
+			}
+			srcClient, err = db.GraphDBZitiClient(identityFile, srcURL)
+			if err != nil {
+				return nil, err
+			}
+			tgtURL,err := URL2ServiceRobust(task.Tgt.URL)
+			if err != nil {
+				return nil, err
+			}
+			tgtClient, err = db.GraphDBZitiClient(identityFile, tgtURL)
+			if err != nil {
+				return nil, err
+			}
+		}
+		db.HttpClient = srcClient
 		srcGraphDB,err := db.GraphDBRepositories(task.Src.URL, task.Src.Username, task.Src.Password)
 		if err != nil {
 			return nil, err
@@ -413,6 +454,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		if !foundRepo {
 			return nil, errors.New("could not find required src repository " + task.Src.Repo)
 		}
+		db.HttpClient = tgtClient
 		tgtGraphDB,err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
 		if err != nil {
 			return nil, err
@@ -440,6 +482,25 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		result["tgt_repo"] = task.Tgt.Repo
 
 	case "graph-migration":
+		if identityFile != "" {
+			srcURL,err := URL2ServiceRobust(task.Src.URL)
+			if err != nil {
+				return nil, err
+			}
+			srcClient, err = db.GraphDBZitiClient(identityFile, srcURL)
+			if err != nil {
+				return nil, err
+			}
+			tgtURL,err := URL2ServiceRobust(task.Tgt.URL)
+			if err != nil {
+				return nil, err
+			}
+			tgtClient, err = db.GraphDBZitiClient(identityFile, tgtURL)
+			if err != nil {
+				return nil, err
+			}
+		}
+		db.HttpClient = srcClient
 		srcGraphDB,err := db.GraphDBRepositories(task.Src.URL, task.Src.Username, task.Src.Password)
 		if err != nil {
 			return nil, err
@@ -471,7 +532,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		if !foundRepo {
 			return nil, errors.New("could not find required src repository " + task.Src.Repo)
 		}
-
+		db.HttpClient = tgtClient
 		tgtGraphDB,err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
 		if err != nil {
 			return nil, err
@@ -507,6 +568,17 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		result["tgt_graph"] = task.Tgt.Graph
 
 	case "repo-delete":
+		if identityFile != "" {
+			tgtURL,err := URL2ServiceRobust(task.Tgt.URL)
+			if err != nil {
+				return nil, err
+			}
+			tgtClient, err = db.GraphDBZitiClient(identityFile, tgtURL)
+			if err != nil {
+				return nil, err
+			}
+		}
+		db.HttpClient = tgtClient
 		tgtGraphDB,err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
 		if err != nil {
 			return nil, err
@@ -523,7 +595,17 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		result["repo"] = task.Tgt.Repo
 
 	case "graph-delete":
-		fmt.Println(task.Tgt)
+		if identityFile != "" {
+			tgtURL,err := URL2ServiceRobust(task.Tgt.URL)
+			if err != nil {
+				return nil, err
+			}
+			tgtClient, err = db.GraphDBZitiClient(identityFile, tgtURL)
+			if err != nil {
+				return nil, err
+			}
+		}
+		db.HttpClient = tgtClient
 		tgtGraphDB, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
 		if err != nil {
 			return nil, err
@@ -540,6 +622,17 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		result["graph"] = task.Tgt.Graph
 
 	case "repo-import":
+		if identityFile != "" {
+			tgtURL,err := URL2ServiceRobust(task.Tgt.URL)
+			if err != nil {
+				return nil, err
+			}
+			tgtClient, err = db.GraphDBZitiClient(identityFile, tgtURL)
+			if err != nil {
+				return nil, err
+			}
+		}
+		db.HttpClient = tgtClient
 		fmt.Println("DEBUG: Starting repo-import processing")
 		
 		// Check if target repository exists
@@ -648,6 +741,17 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		}
 
 	case "repo-create":
+		if identityFile != "" {
+			tgtURL,err := URL2ServiceRobust(task.Tgt.URL)
+			if err != nil {
+				return nil, err
+			}
+			tgtClient, err = db.GraphDBZitiClient(identityFile, tgtURL)
+			if err != nil {
+				return nil, err
+			}
+		}
+		db.HttpClient = tgtClient
 		repoName := task.Tgt.Repo
 		
 		// Check if repository already exists
@@ -735,6 +839,17 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		result["config_file"] = fileHeader.Filename
 
 	case "graph-import":
+		if identityFile != "" {
+			tgtURL,err := URL2ServiceRobust(task.Tgt.URL)
+			if err != nil {
+				return nil, err
+			}
+			tgtClient, err = db.GraphDBZitiClient(identityFile, tgtURL)
+			if err != nil {
+				return nil, err
+			}
+		}
+		db.HttpClient = tgtClient
 		fmt.Println("DEBUG: Starting graph-import processing")
 		
 		fmt.Printf("DEBUG: Fetching repositories from %s\n", task.Tgt.URL)
@@ -903,10 +1018,21 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		// 2. Create new repository with new name
 		// 3. Restore individual graphs to new repository
 		// 4. Delete old repository
-		
+
+		if identityFile != "" {
+			tgtURL,err := URL2ServiceRobust(task.Tgt.URL)
+			if err != nil {
+				return nil, err
+			}
+			tgtClient, err = db.GraphDBZitiClient(identityFile, tgtURL)
+			if err != nil {
+				return nil, err
+			}
+		}
 		oldRepoName := task.Tgt.RepoOld
 		newRepoName := task.Tgt.RepoNew
-		
+		db.HttpClient = tgtClient
+
 		// Step 1: Check if source repository exists
 		srcGraphDB,err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
 		if err != nil {
@@ -1054,9 +1180,20 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		// 2. Import the data into the new graph
 		// 3. Delete the old graph
 		
+		if identityFile != "" {
+			tgtURL,err := URL2ServiceRobust(task.Tgt.URL)
+			if err != nil {
+				return nil, err
+			}
+			tgtClient, err = db.GraphDBZitiClient(identityFile, tgtURL)
+			if err != nil {
+				return nil, err
+			}
+		}
 		oldGraphName := task.Tgt.GraphOld
 		newGraphName := task.Tgt.GraphNew
 		repoName := task.Tgt.Repo
+		db.HttpClient = tgtClient
 		
 		// Step 1: Check if repository exists
 		tgtGraphDB,err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
@@ -1173,20 +1310,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 
 func init() {
 	rootCmd.AddCommand(graphdbCmd)
-	graphdbCmd.Flags().String("url", "http://build-001.graphdb.px:7200", "graphdb instance to connect to")
-	graphdbCmd.Flags().String("repo", "", "repository to be used for importing rdf data")
-	graphdbCmd.Flags().String("user", "", "user to authenticate with")
-	graphdbCmd.Flags().String("pass", "", "password to authenticate with")
-	graphdbCmd.Flags().String("graph", "https://schema.org/Person", "graph name")
-	graphdbCmd.Flags().Bool("delete-graph", false, "delete the grapth either before import of just delete it")
-	graphdbCmd.Flags().Bool("bkp", false, "create an backup")
-	graphdbCmd.Flags().Bool("restore", false, "restore from backup files")
-	graphdbCmd.Flags().Bool("import", false, "import rdf+xml file")
-	graphdbCmd.Flags().Bool("export", false, "export rdf+xml file")
-	graphdbCmd.Flags().Bool("list-graphs", false, "lists all graphs of a given repository")
-	graphdbCmd.Flags().String("import-dir", ".", "import directory from where to pick up the .rdf files")
-	graphdbCmd.Flags().String("import-file", "", "import .rdf file path")
-	graphdbCmd.Flags().String("restore-path", ".", "restore path from where to pick up the .ttl and .brf files")
+	graphdbCmd.Flags().String("identity", "", "identity to authenticate to an ziti network")
 }
 
 func listFiles(dir string, ext string) []string {
@@ -1207,6 +1331,8 @@ var graphdbCmd = &cobra.Command{
 	Short: "service to integrate with graphdb",
 	Long:  `service to integrate with graphdb`,
 	Run: func(cmd *cobra.Command, args []string) {
+		identityFile, _ = cmd.Flags().GetString("identity")
+
 		e := echo.New()
 		
 		// Add request size limit (100MB)
