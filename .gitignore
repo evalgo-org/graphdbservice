@@ -10,3 +10,4 @@ dist
 *.txt
 *.tar
 *.rdf
+/btp.user.json
