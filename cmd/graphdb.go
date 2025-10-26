@@ -1675,6 +1675,11 @@ var graphdbCmd = &cobra.Command{
 			return c.JSON(http.StatusOK, map[string]string{"status": "healthy"})
 		})
 
+		// Favicon endpoint (prevent 404 errors)
+		e.GET("/favicon.ico", func(c echo.Context) error {
+			return c.NoContent(http.StatusNoContent)
+		})
+
 		// Web UI routes (without API key requirement)
 		e.GET("/", uiIndexHandler)
 		e.GET("/ui", uiIndexHandler)

@@ -14,7 +14,7 @@ type TaskStatus struct {
 templ TaskResults(sessionID string, tasks []TaskStatus) {
 	<div class="card">
 		<h2>Task Execution Progress</h2>
-		<div id="sse-container">
+		<div id="sse-container" data-session-id={ sessionID }>
 			<ul class="task-list" id="task-list">
 				for _, task := range tasks {
 					@TaskItem(task)
@@ -24,10 +24,14 @@ templ TaskResults(sessionID string, tasks []TaskStatus) {
 	</div>
 	<script>
 		(function() {
-			const sessionID = "{ sessionID }";
+			const container = document.getElementById('sse-container');
+			const sessionID = container.getAttribute('data-session-id');
 			const eventSource = new EventSource('/ui/stream/' + sessionID);
 
+			console.log('Connecting to SSE stream:', '/ui/stream/' + sessionID);
+
 			eventSource.addEventListener('task-update', function(e) {
+				console.log('Received task update:', e.data);
 				const parser = new DOMParser();
 				const doc = parser.parseFromString(e.data, 'text/html');
 				const newTask = doc.querySelector('.task-item');
@@ -38,6 +42,7 @@ templ TaskResults(sessionID string, tasks []TaskStatus) {
 
 					if (existingTask) {
 						existingTask.outerHTML = newTask.outerHTML;
+						console.log('Updated task at index:', taskIndex);
 					}
 				}
 			});
@@ -47,6 +52,10 @@ templ TaskResults(sessionID string, tasks []TaskStatus) {
 				if (eventSource.readyState === EventSource.CLOSED) {
 					console.log('SSE connection closed');
 				}
+			};
+
+			eventSource.onopen = function() {
+				console.log('SSE connection opened successfully');
 			};
 
 			// Close connection when page is unloaded
