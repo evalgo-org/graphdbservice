@@ -144,8 +144,6 @@ build:versioned:
     expire_in: 1 month
   rules:
     - if: '$CI_COMMIT_TAG'
-  only:
-    - tags
 
 # Docker Image Build (requires nixpacks)
 # Uncomment and configure if you want to build Docker images in CI
