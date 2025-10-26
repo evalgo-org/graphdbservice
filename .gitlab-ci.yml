@@ -1,0 +1,208 @@
+# GitLab CI/CD Pipeline for GraphDB Service (pxgraphservice)
+#
+# This pipeline automates testing, building, and deployment of the GraphDB Service.
+# It uses the taskfile.yml for task automation and ensures code quality standards.
+
+# Define pipeline stages
+stages:
+  - test
+  - build
+  - quality
+  - deploy
+
+# Global variables
+variables:
+  GRAPHDB_VERS: "10.8.5"
+  VERS: "v0.0.3"
+  GO_VERSION: "1.25.1"
+  TASK_VERSION: "3.39.2"
+
+# Cache configuration to speed up builds
+.go-cache:
+  cache:
+    key:
+      files:
+        - go.sum
+    paths:
+      - .go/pkg/mod/
+
+# Base job template for Go projects
+.go-base:
+  image: golang:${GO_VERSION}
+  extends: .go-cache
+  before_script:
+    # Install task-runner
+    - sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin v${TASK_VERSION}
+    # Verify installation
+    - go version
+    - task --version
+    # Download dependencies
+    - go mod download
+
+# Unit Tests Job
+# Executes the test:unit task from taskfile.yml which runs tests with coverage
+test:unit:
+  stage: test
+  extends: .go-base
+  script:
+    - echo "Running unit tests with coverage..."
+    - task test:unit
+  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.out
+      - coverage.html
+    expire_in: 1 week
+    when: always
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_TAG'
+
+# Verbose Tests with Race Detection
+test:race:
+  stage: test
+  extends: .go-base
+  script:
+    - echo "Running tests with race detector..."
+    - task test:verbose
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  allow_failure: false
+
+# Code Formatting Check
+quality:fmt:
+  stage: quality
+  extends: .go-base
+  script:
+    - echo "Checking code formatting..."
+    - gofmt -l . | grep -v '^$' && echo "Files need formatting" && exit 1 || echo "All files formatted correctly"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# Go Vet Check
+quality:vet:
+  stage: quality
+  extends: .go-base
+  script:
+    - echo "Running go vet..."
+    - task vet
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# Linting (Optional - requires golangci-lint)
+quality:lint:
+  stage: quality
+  extends: .go-base
+  before_script:
+    - sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin v${TASK_VERSION}
+    - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+    - export PATH=$PATH:$(go env GOPATH)/bin
+  script:
+    - echo "Running golangci-lint..."
+    - task lint
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  allow_failure: true
+
+# Build Binary
+build:binary:
+  stage: build
+  extends: .go-base
+  script:
+    - echo "Building application binary..."
+    - task build
+    - ls -lh graphservice
+  artifacts:
+    paths:
+      - graphservice
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_TAG'
+
+# Build Versioned Binary with Build Info
+build:versioned:
+  stage: build
+  extends: .go-base
+  script:
+    - echo "Building versioned binary..."
+    - task build:versioned
+    - ls -lh graphservice
+    - ./graphservice version
+  artifacts:
+    paths:
+      - graphservice
+    expire_in: 1 month
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  only:
+    - tags
+
+# Docker Image Build (requires nixpacks)
+# Uncomment and configure if you want to build Docker images in CI
+# build:docker:
+#   stage: build
+#   image: docker:latest
+#   services:
+#     - docker:dind
+#   before_script:
+#     - curl -sSL https://nixpacks.com/install.sh | bash
+#   script:
+#     - echo "Building Docker image..."
+#     - nixpacks build . --name $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+#     - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA $CI_REGISTRY_IMAGE:latest
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == "main"'
+#     - if: '$CI_COMMIT_TAG'
+
+# CI Check - Run all CI checks together
+ci:full:
+  stage: test
+  extends: .go-base
+  script:
+    - echo "Running full CI check suite..."
+    - task ci
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  allow_failure: false
+
+# Deploy Job Template (customize for your deployment target)
+# deploy:staging:
+#   stage: deploy
+#   extends: .go-base
+#   script:
+#     - echo "Deploying to staging environment..."
+#     # Add your deployment commands here
+#   environment:
+#     name: staging
+#     url: https://staging.example.com
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == "main"'
+#       when: manual
+
+# deploy:production:
+#   stage: deploy
+#   extends: .go-base
+#   script:
+#     - echo "Deploying to production environment..."
+#     # Add your deployment commands here
+#   environment:
+#     name: production
+#     url: https://production.example.com
+#   rules:
+#     - if: '$CI_COMMIT_TAG'
+#       when: manual
+#   only:
+#     - tags

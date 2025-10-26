@@ -6,18 +6,140 @@ vars:
 
 tasks:
   default:
+    desc: Display project information
     cmds:
-      - echo "pxgraphdb service"
+      - echo "pxgraphdb service - GraphDB Repository and Graph Management API"
+      - echo "Version {{.VERS}}"
+      - echo ""
+      - echo "Available tasks"
+      - task --list
+
+  # Testing tasks
+  test:
+    desc: Run unit tests
+    cmds:
+      - go test -v ./...
+
+  test:unit:
+    desc: Run unit tests with coverage
+    cmds:
+      - echo "Running unit tests with coverage..."
+      - go test -v -coverprofile=coverage.out -covermode=atomic ./...
+      - go tool cover -func=coverage.out | tail -1
+      - echo "Coverage report generated at coverage.out"
+
+  test:coverage:
+    desc: Generate and view HTML coverage report
+    deps: [test:unit]
+    cmds:
+      - go tool cover -html=coverage.out -o coverage.html
+      - echo "Coverage HTML report generated at coverage.html"
+
+  test:verbose:
+    desc: Run tests with verbose output
+    cmds:
+      - go test -v -race ./...
+
+  # Code quality tasks
+  fmt:
+    desc: Format Go code
+    cmds:
+      - go fmt ./...
+
+  vet:
+    desc: Run Go vet
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run
+
+  # Build tasks
+  build:
+    desc: Build the application
+    cmds:
+      - go build -o graphservice main.go
+      - echo "Binary built at graphservice"
+
+  build:versioned:
+    desc: Build with version information
+    cmds:
+      - |
+        go build \
+          -ldflags="-X 'github.com/spf13/cobra.version={{.VERS}}' \
+                    -X 'github.com/spf13/cobra.commit=$(git rev-parse HEAD)' \
+                    -X 'github.com/spf13/cobra.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)'" \
+          -o graphservice main.go
+      - echo "Versioned binary built at graphservice"
+
+  # Docker and container tasks
   local-setup:
+    desc: Start local GraphDB instances for testing
     cmds:
       - docker pull ontotext/graphdb:{{.GRAPHDB_VERS}}
       - docker rm -f test-src-graphdb || true
       - docker rm -f test-tgt-graphdb || true
       - docker run -d --name test-src-graphdb -p 7201:7200 ontotext/graphdb:{{.GRAPHDB_VERS}}
       - docker run -d --name test-tgt-graphdb -p 7202:7200 ontotext/graphdb:{{.GRAPHDB_VERS}}
+      - cmd: echo "GraphDB instances started"
+      - cmd: echo "  - Source at http://localhost:7201"
+      - cmd: echo "  - Target at http://localhost:7202"
+
+  local-teardown:
+    desc: Stop and remove local GraphDB instances
+    cmds:
+      - docker rm -f test-src-graphdb || true
+      - docker rm -f test-tgt-graphdb || true
+      - echo "GraphDB instances stopped and removed"
+
   image-build-local:
+    desc: Build and push Docker image
     cmds:
       - nixpacks build . --name private.hz.pantopix.net/pxgraphdb/service:{{.VERS}}
       - docker tag private.hz.pantopix.net/pxgraphdb/service:{{.VERS}} private.hz.pantopix.net/pxgraphdb/service:latest
       - docker push private.hz.pantopix.net/pxgraphdb/service:{{.VERS}}
       - docker push private.hz.pantopix.net/pxgraphdb/service:latest
+      - echo "Docker image built and pushed {{.VERS}}"
+
+  # Cleanup tasks
+  clean:
+    desc: Clean build artifacts and test files
+    cmds:
+      - rm -f graphservice
+      - rm -f coverage.out coverage.html
+      - rm -f *.ttl *.brf *.rdf
+      - echo "Cleaned build artifacts and test files"
+
+  # CI tasks
+  ci:
+    desc: Run all CI checks (test, vet, fmt check)
+    cmds:
+      - task: test:unit
+      - task: vet
+      - gofmt -l . | grep -v '^$' && echo "Files need formatting" && exit 1 || echo "All files formatted correctly"
+      - echo "All CI checks passed!"
+
+  # Development tasks
+  dev:
+    desc: Run the service in development mode
+    cmds:
+      - echo "Starting GraphDB service in development mode..."
+      - echo "Set API_KEY environment variable before running"
+      - go run main.go graphdb
+
+  help:
+    desc: Show detailed help information
+    cmds:
+      - echo "GraphDB Service - Task Automation"
+      - echo "=================================="
+      - echo ""
+      - task --list
+      - echo ""
+      - cmd: echo "Examples:"
+      - cmd: echo "  task test              # Run unit tests"
+      - cmd: echo "  task test:unit         # Run tests with coverage"
+      - cmd: echo "  task build             # Build the binary"
+      - cmd: echo "  task local-setup       # Start test GraphDB instances"
+      - cmd: echo "  task ci                # Run all CI checks"

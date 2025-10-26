@@ -12,3 +12,14 @@ dist
 *.rdf
 /btp.user.json
 pxgraphservice
+
+# Temporary files
+tmp/
+*.tmp
+*.temp
+.tmp/
+temp/
+
+# Test coverage
+coverage.out
+coverage.html
