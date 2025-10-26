@@ -34,7 +34,7 @@ import (
 
 var (
 	// cfgFile holds the path to the configuration file
-	cfgFile     string
+	cfgFile string
 	// userLicense stores the license name for the project
 	userLicense string
 

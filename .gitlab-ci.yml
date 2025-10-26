@@ -184,10 +184,8 @@ ci:full:
     - task ci
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: manual
     - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_COMMIT_BRANCH == "service"'
-      when: manual
   allow_failure: false
 
 # Deploy Job Template (customize for your deployment target)
