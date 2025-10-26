@@ -24,9 +24,19 @@ templ TaskResults(sessionID string, tasks []TaskStatus) {
 	</div>
 	<script>
 		(function() {
+			// Close any existing SSE connection before creating a new one
+			if (window.currentEventSource) {
+				console.log('Closing previous SSE connection');
+				window.currentEventSource.close();
+				window.currentEventSource = null;
+			}
+
 			const container = document.getElementById('sse-container');
 			const sessionID = container.getAttribute('data-session-id');
 			const eventSource = new EventSource('/ui/stream/' + sessionID);
+
+			// Store in global variable for cleanup
+			window.currentEventSource = eventSource;
 
 			console.log('Connecting to SSE stream:', '/ui/stream/' + sessionID);
 
@@ -60,7 +70,10 @@ templ TaskResults(sessionID string, tasks []TaskStatus) {
 
 			// Close connection when page is unloaded
 			window.addEventListener('beforeunload', function() {
-				eventSource.close();
+				if (window.currentEventSource) {
+					window.currentEventSource.close();
+					window.currentEventSource = null;
+				}
 			});
 		})();
 	</script>

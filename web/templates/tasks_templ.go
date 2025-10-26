@@ -63,7 +63,7 @@ func TaskResults(sessionID string, tasks []TaskStatus) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</ul></div></div><script>\n\t\t(function() {\n\t\t\tconst container = document.getElementById('sse-container');\n\t\t\tconst sessionID = container.getAttribute('data-session-id');\n\t\t\tconst eventSource = new EventSource('/ui/stream/' + sessionID);\n\n\t\t\tconsole.log('Connecting to SSE stream:', '/ui/stream/' + sessionID);\n\n\t\t\teventSource.addEventListener('task-update', function(e) {\n\t\t\t\tconsole.log('Received task update:', e.data);\n\t\t\t\tconst parser = new DOMParser();\n\t\t\t\tconst doc = parser.parseFromString(e.data, 'text/html');\n\t\t\t\tconst newTask = doc.querySelector('.task-item');\n\n\t\t\t\tif (newTask) {\n\t\t\t\t\tconst taskIndex = newTask.getAttribute('data-index');\n\t\t\t\t\tconst existingTask = document.querySelector('.task-item[data-index=\"' + taskIndex + '\"]');\n\n\t\t\t\t\tif (existingTask) {\n\t\t\t\t\t\texistingTask.outerHTML = newTask.outerHTML;\n\t\t\t\t\t\tconsole.log('Updated task at index:', taskIndex);\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t});\n\n\t\t\teventSource.onerror = function(e) {\n\t\t\t\tconsole.error('SSE Error:', e);\n\t\t\t\tif (eventSource.readyState === EventSource.CLOSED) {\n\t\t\t\t\tconsole.log('SSE connection closed');\n\t\t\t\t}\n\t\t\t};\n\n\t\t\teventSource.onopen = function() {\n\t\t\t\tconsole.log('SSE connection opened successfully');\n\t\t\t};\n\n\t\t\t// Close connection when page is unloaded\n\t\t\twindow.addEventListener('beforeunload', function() {\n\t\t\t\teventSource.close();\n\t\t\t});\n\t\t})();\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</ul></div></div><script>\n\t\t(function() {\n\t\t\t// Close any existing SSE connection before creating a new one\n\t\t\tif (window.currentEventSource) {\n\t\t\t\tconsole.log('Closing previous SSE connection');\n\t\t\t\twindow.currentEventSource.close();\n\t\t\t\twindow.currentEventSource = null;\n\t\t\t}\n\n\t\t\tconst container = document.getElementById('sse-container');\n\t\t\tconst sessionID = container.getAttribute('data-session-id');\n\t\t\tconst eventSource = new EventSource('/ui/stream/' + sessionID);\n\n\t\t\t// Store in global variable for cleanup\n\t\t\twindow.currentEventSource = eventSource;\n\n\t\t\tconsole.log('Connecting to SSE stream:', '/ui/stream/' + sessionID);\n\n\t\t\teventSource.addEventListener('task-update', function(e) {\n\t\t\t\tconsole.log('Received task update:', e.data);\n\t\t\t\tconst parser = new DOMParser();\n\t\t\t\tconst doc = parser.parseFromString(e.data, 'text/html');\n\t\t\t\tconst newTask = doc.querySelector('.task-item');\n\n\t\t\t\tif (newTask) {\n\t\t\t\t\tconst taskIndex = newTask.getAttribute('data-index');\n\t\t\t\t\tconst existingTask = document.querySelector('.task-item[data-index=\"' + taskIndex + '\"]');\n\n\t\t\t\t\tif (existingTask) {\n\t\t\t\t\t\texistingTask.outerHTML = newTask.outerHTML;\n\t\t\t\t\t\tconsole.log('Updated task at index:', taskIndex);\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t});\n\n\t\t\teventSource.onerror = function(e) {\n\t\t\t\tconsole.error('SSE Error:', e);\n\t\t\t\tif (eventSource.readyState === EventSource.CLOSED) {\n\t\t\t\t\tconsole.log('SSE connection closed');\n\t\t\t\t}\n\t\t\t};\n\n\t\t\teventSource.onopen = function() {\n\t\t\t\tconsole.log('SSE connection opened successfully');\n\t\t\t};\n\n\t\t\t// Close connection when page is unloaded\n\t\t\twindow.addEventListener('beforeunload', function() {\n\t\t\t\tif (window.currentEventSource) {\n\t\t\t\t\twindow.currentEventSource.close();\n\t\t\t\t\twindow.currentEventSource = null;\n\t\t\t\t}\n\t\t\t});\n\t\t})();\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -117,7 +117,7 @@ func TaskItem(task TaskStatus) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs("task-" + string(rune(task.Index)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 70, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 83, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -130,7 +130,7 @@ func TaskItem(task TaskStatus) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(string(rune(task.Index + 48)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 70, Col: 124}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 83, Col: 124}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -143,7 +143,7 @@ func TaskItem(task TaskStatus) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(string(rune(task.Index + 49)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 73, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 86, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -156,7 +156,7 @@ func TaskItem(task TaskStatus) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(task.Action)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 73, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 86, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -197,7 +197,7 @@ func TaskItem(task TaskStatus) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(task.Status)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 79, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 92, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -215,7 +215,7 @@ func TaskItem(task TaskStatus) templ.Component {
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(task.SrcRepo)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 86, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 99, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -229,7 +229,7 @@ func TaskItem(task TaskStatus) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(" / " + task.SrcGraph)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 88, Col: 29}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 101, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -249,7 +249,7 @@ func TaskItem(task TaskStatus) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(task.TgtRepo)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 94, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 107, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -263,7 +263,7 @@ func TaskItem(task TaskStatus) templ.Component {
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(" / " + task.TgtGraph)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 96, Col: 29}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 109, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
@@ -287,7 +287,7 @@ func TaskItem(task TaskStatus) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(task.Message)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 104, Col: 18}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/tasks.templ`, Line: 117, Col: 18}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
