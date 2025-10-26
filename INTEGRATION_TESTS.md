@@ -504,26 +504,50 @@ Each GraphDB instance requires:
 
 ## Maintenance
 
-### Updating GraphDB Versions
+### Changing GraphDB Version
 
-To test with different GraphDB versions:
+The GraphDB version is configured as a global variable in `taskfile.yml` at line 4:
 
-1. Update `taskfile.yml`:
+```yaml
+vars:
+  GRAPHDB_VERS: 10.8.5
+```
+
+**To change the version:**
+
+1. Edit `taskfile.yml` line 4:
    ```yaml
    vars:
-     GRAPHDB_VERS: 10.9.0  # New version
+     GRAPHDB_VERS: 10.9.0  # Or any other 10.x.x version
    ```
 
-2. Add additional test instances:
+2. Run the tests:
+   ```bash
+   task test:integration:full
+   ```
+
+**Important Notes:**
+- Only use 10.x.x versions to avoid license issues
+- All tasks automatically use `{{.GRAPHDB_VERS}}` variable
+- No need to update individual task commands
+- The same version is used for both source and target instances
+
+**Testing Multiple Versions:**
+
+To test migrations between different versions:
+
+1. Add additional test instances in `test:integration:setup`:
    ```yaml
-   - docker pull ontotext/graphdb:10.8.0
-   - docker run -d --name graphdb-10-8-test -p 7204:7200 ...
+   - docker pull ontotext/graphdb:10.7.4
+   - docker run -d --name graphdb-10-7-test -p 7203:7200 -e GDB_HEAP_SIZE=2g ontotext/graphdb:10.7.4
    ```
 
-3. Update test constants in `graphdb_integration_test.go`:
+2. Update test constants in `graphdb_integration_test.go`:
    ```go
-   const graphDB108URL = "http://localhost:7204"
+   const graphDB107URL = "http://localhost:7203"
    ```
+
+3. Add cross-version migration tests
 
 ### Adding New Test Cases
 
