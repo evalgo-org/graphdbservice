@@ -21,39 +21,102 @@ import (
 )
 
 var (
+	// identityFile holds the path to the Ziti identity JSON file for zero-trust networking.
+	// When provided, all GraphDB connections will use Ziti secure networking.
 	identityFile string = ""
 )
 
-// Request structures
+// MigrationRequest represents the root request structure for GraphDB operations.
+// It contains the API version and a list of tasks to be executed sequentially.
+//
+// Example JSON:
+//
+//	{
+//	  "version": "v0.0.1",
+//	  "tasks": [
+//	    {
+//	      "action": "repo-migration",
+//	      "src": {"url": "http://source:7200", "username": "admin", "password": "pass", "repo": "source-repo"},
+//	      "tgt": {"url": "http://target:7200", "username": "admin", "password": "pass", "repo": "target-repo"}
+//	    }
+//	  ]
+//	}
 type MigrationRequest struct {
-	Version string `json:"version" validate:"required"`
-	Tasks   []Task `json:"tasks" validate:"required"`
+	Version string `json:"version" validate:"required"` // API version (e.g., "v0.0.1")
+	Tasks   []Task `json:"tasks" validate:"required"`   // List of tasks to execute
 }
 
+// Task represents a single operation to be performed on GraphDB repositories or graphs.
+//
+// Supported actions:
+//   - repo-migration: Migrate entire repository (config + data)
+//   - graph-migration: Migrate a named graph between repositories
+//   - repo-delete: Delete a repository
+//   - graph-delete: Delete a named graph
+//   - repo-create: Create a new repository from TTL configuration
+//   - graph-import: Import RDF data into a graph
+//   - repo-import: Import repository from BRF backup file
+//   - repo-rename: Rename a repository (backup, recreate, restore)
+//   - graph-rename: Rename a graph (export, import, delete)
 type Task struct {
-	Action string      `json:"action" validate:"required"`
-	Src    *Repository `json:"src,omitempty"`
-	Tgt    *Repository `json:"tgt,omitempty"`
+	Action string      `json:"action" validate:"required"` // The action to perform
+	Src    *Repository `json:"src,omitempty"`              // Source repository/graph (for migration operations)
+	Tgt    *Repository `json:"tgt,omitempty"`              // Target repository/graph (for all operations)
 }
 
+// Repository represents the connection details and identifiers for a GraphDB repository or graph.
+// Different fields are required depending on the operation being performed.
+//
+// Field usage by action:
+//   - repo-migration: URL, Username, Password, Repo required for both Src and Tgt
+//   - graph-migration: URL, Username, Password, Repo, Graph required for both Src and Tgt
+//   - repo-delete: URL, Username, Password, Repo required for Tgt
+//   - graph-delete: URL, Username, Password, Repo, Graph required for Tgt
+//   - repo-create: URL, Username, Password, Repo required for Tgt (+ config file)
+//   - graph-import: URL, Username, Password, Repo, Graph required for Tgt (+ data files)
+//   - repo-import: URL, Username, Password, Repo required for Tgt (+ BRF file)
+//   - repo-rename: URL, Username, Password, RepoOld, RepoNew required for Tgt
+//   - graph-rename: URL, Username, Password, Repo, GraphOld, GraphNew required for Tgt
 type Repository struct {
-	URL      string `json:"url,omitempty"`
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
-	Repo     string `json:"repo,omitempty"`
-	Graph    string `json:"graph,omitempty"`
-	RepoOld  string `json:"repo_old,omitempty"`
-	RepoNew  string `json:"repo_new,omitempty"`
-	GraphOld string `json:"graph_old,omitempty"`
-	GraphNew string `json:"graph_new,omitempty"`
+	URL      string `json:"url,omitempty"`       // GraphDB server URL (e.g., "http://localhost:7200")
+	Username string `json:"username,omitempty"`  // GraphDB username for authentication
+	Password string `json:"password,omitempty"`  // GraphDB password for authentication
+	Repo     string `json:"repo,omitempty"`      // Repository name
+	Graph    string `json:"graph,omitempty"`     // Named graph URI or name
+	RepoOld  string `json:"repo_old,omitempty"`  // Old repository name (for repo-rename)
+	RepoNew  string `json:"repo_new,omitempty"`  // New repository name (for repo-rename)
+	GraphOld string `json:"graph_old,omitempty"` // Old graph name (for graph-rename)
+	GraphNew string `json:"graph_new,omitempty"` // New graph name (for graph-rename)
 }
 
+// md5Hash generates an MD5 hash of the given text string.
+// This is used to create unique temporary file names during graph operations.
+//
+// Parameters:
+//   - text: The input string to hash
+//
+// Returns:
+//   - A hexadecimal string representation of the MD5 hash
 func md5Hash(text string) string {
 	hash := md5.Sum([]byte(text))
 	return fmt.Sprintf("%x", hash)
 }
 
-// API Key validation middleware
+// apiKeyMiddleware validates the API key in the request header.
+// It checks the "x-api-key" header against the API_KEY environment variable.
+// If the key is missing or invalid, it returns a 401 Unauthorized error.
+//
+// This middleware should be applied to all endpoints that require authentication.
+//
+// Environment Variables:
+//   - API_KEY: The expected API key value
+//
+// HTTP Headers:
+//   - x-api-key: The API key provided by the client
+//
+// Returns:
+//   - 401 Unauthorized if the API key is missing or invalid
+//   - Otherwise, passes control to the next handler
 func apiKeyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		apiKey := c.Request().Header.Get("x-api-key")
@@ -71,7 +134,14 @@ func apiKeyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
-// Helper function to extract file names from file headers
+// getFileNames extracts the filenames from a slice of multipart file headers.
+// This is a utility function used when processing multipart form uploads.
+//
+// Parameters:
+//   - fileHeaders: Slice of multipart file headers from a form upload
+//
+// Returns:
+//   - A slice of strings containing the filename from each file header
 func getFileNames(fileHeaders []*multipart.FileHeader) []string {
 	names := make([]string, len(fileHeaders))
 	for i, fh := range fileHeaders {
@@ -80,7 +150,24 @@ func getFileNames(fileHeaders []*multipart.FileHeader) []string {
 	return names
 }
 
-// Helper function to update repository name in TTL configuration file
+// updateRepositoryNameInConfig updates repository name references in a GraphDB TTL configuration file.
+// It replaces all occurrences of the old repository name with the new name in various TTL patterns.
+//
+// The function handles common GraphDB repository configuration patterns:
+//   - rep:repositoryID "oldName" -> rep:repositoryID "newName"
+//   - <http://www.openrdf.org/config/repository#oldName> -> <...#newName>
+//   - repo:oldName -> repo:newName
+//
+// This is primarily used during repository rename operations to update the configuration
+// before creating a new repository with the updated name.
+//
+// Parameters:
+//   - configFile: Path to the TTL configuration file to update
+//   - oldName: The old repository name to replace
+//   - newName: The new repository name to use
+//
+// Returns:
+//   - error: nil on success, or an error if reading/writing the file fails
 func updateRepositoryNameInConfig(configFile, oldName, newName string) error {
 	// Read the configuration file
 	content, err := os.ReadFile(configFile)
@@ -119,7 +206,27 @@ func updateRepositoryNameInConfig(configFile, oldName, newName string) error {
 	return nil
 }
 
-// Helper function to get triple counts for graphs (for verification purposes)
+// getGraphTripleCounts retrieves the triple counts for two graphs in a GraphDB repository.
+// This is intended for verification purposes after graph operations like rename or migration.
+//
+// Note: This is currently a stub implementation that returns -1 for both counts.
+// A full implementation would execute SPARQL COUNT queries against the specified graphs.
+//
+// Example SPARQL query for triple count:
+//
+//	SELECT (COUNT(*) AS ?count) WHERE { GRAPH <graphURI> { ?s ?p ?o } }
+//
+// Parameters:
+//   - url: GraphDB server URL
+//   - username: Authentication username
+//   - password: Authentication password
+//   - repo: Repository name
+//   - oldGraph: First graph URI/name to count
+//   - newGraph: Second graph URI/name to count
+//
+// Returns:
+//   - oldCount: Number of triples in the old graph (-1 if unavailable)
+//   - newCount: Number of triples in the new graph (-1 if unavailable)
 func getGraphTripleCounts(url, username, password, repo, oldGraph, newGraph string) (int, int) {
 	// This is a simplified implementation - you might want to implement actual SPARQL queries
 	// to get precise triple counts. For now, we return -1 to indicate counts are not available.
@@ -138,7 +245,25 @@ func getGraphTripleCounts(url, username, password, repo, oldGraph, newGraph stri
 	return oldCount, newCount
 }
 
-// Helper function to determine RDF file type based on extension
+// getFileType determines the RDF serialization format based on the file extension.
+// This is used to specify the correct content type when importing data into GraphDB.
+//
+// Supported formats:
+//   - .brf: Binary RDF (GraphDB's backup format)
+//   - .rdf, .xml: RDF/XML
+//   - .ttl: Turtle
+//   - .nt: N-Triples
+//   - .n3: Notation3
+//   - .jsonld, .json: JSON-LD
+//   - .trig: TriG (for named graphs)
+//   - .nq: N-Quads
+//   - default: text/plain
+//
+// Parameters:
+//   - filename: The name of the file (extension is extracted and compared)
+//
+// Returns:
+//   - The RDF format identifier string (e.g., "turtle", "rdf-xml", "binary-rdf")
 func getFileType(filename string) string {
 	filename = strings.ToLower(filename)
 
@@ -164,7 +289,15 @@ func getFileType(filename string) string {
 	}
 }
 
-// Helper function to extract repository names from GraphDB bindings
+// getRepositoryNames extracts repository names from GraphDB API response bindings.
+// GraphDB's SPARQL endpoint returns results in a bindings format where each binding
+// contains an "Id" field with a "value" key containing the repository name.
+//
+// Parameters:
+//   - bindings: Slice of GraphDBBinding structures from the eve.evalgo.org/db package
+//
+// Returns:
+//   - A slice of repository name strings extracted from the bindings
 func getRepositoryNames(bindings []db.GraphDBBinding) []string {
 	names := make([]string, 0)
 	for _, binding := range bindings {
@@ -175,7 +308,25 @@ func getRepositoryNames(bindings []db.GraphDBBinding) []string {
 	return names
 }
 
-// Migration handler with multipart form support
+// migrationHandler is the main HTTP handler for the /v1/api/action endpoint.
+// It routes requests to either the JSON or multipart handler based on the Content-Type header.
+//
+// This handler supports two request formats:
+//   - application/json: Routes to migrationHandlerJSON
+//   - multipart/form-data: Routes to migrationHandlerMultipart
+//
+// The multipart format is required when uploading configuration files or RDF data files
+// along with the task definitions.
+//
+// HTTP Method: POST
+// Endpoint: /v1/api/action
+// Authentication: Requires x-api-key header (enforced by middleware)
+//
+// Parameters:
+//   - c: Echo context containing the HTTP request and response
+//
+// Returns:
+//   - error: HTTP error if the request fails, or nil on success
 func migrationHandler(c echo.Context) error {
 	// Check if this is a multipart form request
 	contentType := c.Request().Header.Get("Content-Type")
@@ -191,7 +342,45 @@ func migrationHandler(c echo.Context) error {
 	}
 }
 
-// Original JSON handler for backward compatibility
+// migrationHandlerJSON processes GraphDB operations submitted as JSON requests.
+// This handler is used for operations that don't require file uploads (e.g., repository
+// migration, graph migration, delete operations).
+//
+// The request body must be a valid MigrationRequest JSON object containing a version
+// and a list of tasks. Each task is processed sequentially, and results are collected
+// and returned in the response.
+//
+// Request Format:
+//
+//	{
+//	  "version": "v0.0.1",
+//	  "tasks": [
+//	    {
+//	      "action": "repo-migration",
+//	      "src": {...},
+//	      "tgt": {...}
+//	    }
+//	  ]
+//	}
+//
+// Response Format:
+//
+//	{
+//	  "status": "success",
+//	  "version": "v0.0.1",
+//	  "results": [...]
+//	}
+//
+// HTTP Method: POST
+// Content-Type: application/json
+//
+// Parameters:
+//   - c: Echo context containing the HTTP request and response
+//
+// Returns:
+//   - error: 400 Bad Request if the JSON is invalid or tasks are malformed
+//   - error: 500 Internal Server Error if task processing fails
+//   - nil: On success, with JSON response containing task results
 func migrationHandlerJSON(c echo.Context) error {
 	var req MigrationRequest
 
@@ -232,7 +421,36 @@ func migrationHandlerJSON(c echo.Context) error {
 	})
 }
 
-// New multipart form handler
+// migrationHandlerMultipart processes GraphDB operations submitted as multipart form data.
+// This handler is required for operations that involve file uploads, such as:
+//   - repo-create (requires TTL configuration file)
+//   - graph-import (requires RDF data files)
+//   - repo-import (requires BRF backup file)
+//
+// The multipart form must contain:
+//   - "request" field: JSON string containing the MigrationRequest object
+//   - "task_{index}_config" field: Configuration file for task at index (for repo-create)
+//   - "task_{index}_files" field: RDF data files for task at index (for graph-import/repo-import)
+//
+// Example form fields:
+//   - request: {"version": "v0.0.1", "tasks": [...]}
+//   - task_0_config: repo-config.ttl (for first task if repo-create)
+//   - task_0_files: data.ttl, data2.nt (for first task if graph-import)
+//
+// The handler parses the form, extracts files, and processes each task sequentially.
+// It includes panic recovery to handle unexpected errors gracefully.
+//
+// HTTP Method: POST
+// Content-Type: multipart/form-data
+// Memory Limit: 32MB per request
+//
+// Parameters:
+//   - c: Echo context containing the HTTP request and response
+//
+// Returns:
+//   - error: 400 Bad Request if the form is invalid or files are missing
+//   - error: 500 Internal Server Error if task processing fails
+//   - nil: On success, with JSON response containing task results
 func migrationHandlerMultipart(c echo.Context) error {
 	fmt.Println("DEBUG: Starting multipart form processing")
 
@@ -343,6 +561,24 @@ func migrationHandlerMultipart(c echo.Context) error {
 	})
 }
 
+// validateTask validates that a task has the correct structure and required fields
+// based on its action type. This prevents invalid requests from being processed.
+//
+// Validation rules by action:
+//   - repo-migration, graph-migration: Requires both Src and Tgt repositories
+//   - repo-delete, graph-delete: Requires Tgt repository
+//   - repo-create: Requires Tgt repository (config file validated separately)
+//   - graph-import: Requires Tgt repository (data files validated separately)
+//   - repo-import: Requires Tgt repository (BRF file validated separately)
+//   - repo-rename: Requires Tgt with RepoOld and RepoNew fields
+//   - graph-rename: Requires Tgt with GraphOld and GraphNew fields
+//
+// Parameters:
+//   - task: The Task structure to validate
+//
+// Returns:
+//   - error: 400 Bad Request if validation fails, describing the missing/invalid field
+//   - nil: If the task structure is valid for its action type
 func validateTask(task Task) error {
 	validActions := map[string]bool{
 		"repo-migration":  true,
@@ -382,6 +618,25 @@ func validateTask(task Task) error {
 	return nil
 }
 
+// URL2ServiceRobust parses a URL string and extracts the service portion (host:port).
+// This function is more forgiving than standard URL parsing - it automatically adds
+// the http:// scheme if missing, which helps with user-provided URLs.
+//
+// The function is primarily used when working with Ziti networking to extract the
+// service identifier from a full GraphDB URL.
+//
+// Examples:
+//   - "http://localhost:7200" -> "localhost:7200"
+//   - "https://graphdb.example.com:7200" -> "graphdb.example.com:7200"
+//   - "graphdb:7200" -> "graphdb:7200" (scheme added automatically)
+//   - "localhost" -> "localhost" (port omitted if not specified)
+//
+// Parameters:
+//   - urlStr: The URL string to parse (with or without scheme)
+//
+// Returns:
+//   - service: The host:port portion of the URL, or just host if port not specified
+//   - error: An error if the URL cannot be parsed
 func URL2ServiceRobust(urlStr string) (string, error) {
 	// Add scheme if missing to help url.Parse work correctly
 	if !strings.HasPrefix(urlStr, "http://") && !strings.HasPrefix(urlStr, "https://") {
@@ -396,6 +651,71 @@ func URL2ServiceRobust(urlStr string) (string, error) {
 	return parsedURL.Hostname(), nil
 }
 
+// processTask executes a single GraphDB operation task based on the specified action.
+// This is the core processing function that handles all supported operations.
+//
+// Supported Actions:
+//
+//  1. repo-migration: Migrates an entire repository from source to target GraphDB
+//     - Downloads source repository configuration (TTL) and data (BRF)
+//     - Creates target repository with the configuration
+//     - Restores data from BRF backup
+//     - Cleans up temporary files
+//
+//  2. graph-migration: Migrates a named graph between repositories
+//     - Exports source graph as RDF
+//     - Imports RDF into target graph
+//     - Cleans up temporary files
+//
+//  3. repo-delete: Deletes a repository from GraphDB
+//     - Calls GraphDB delete repository API
+//
+//  4. graph-delete: Deletes a named graph from a repository
+//     - Calls GraphDB delete graph API
+//
+//  5. repo-create: Creates a new repository from TTL configuration
+//     - Reads configuration from multipart file upload
+//     - Creates repository via GraphDB API
+//
+//  6. graph-import: Imports RDF data files into a named graph
+//     - Reads RDF files from multipart upload
+//     - Detects RDF format from file extensions
+//     - Imports each file into the target graph
+//
+//  7. repo-import: Restores a repository from BRF backup file
+//     - Reads BRF file from multipart upload
+//     - Restores repository via GraphDB API
+//
+//  8. repo-rename: Renames a repository (backup, recreate, restore flow)
+//     - Downloads old repository configuration and data
+//     - Updates repository name in configuration
+//     - Creates new repository with updated name
+//     - Restores data from backup
+//     - Deletes old repository
+//     - Cleans up temporary files
+//
+//  9. graph-rename: Renames a named graph (export, import, delete flow)
+//     - Exports old graph as RDF
+//     - Imports RDF into new graph
+//     - Deletes old graph
+//     - Cleans up temporary files
+//
+// Ziti Support:
+// If the global identityFile variable is set, the function creates Ziti-enabled HTTP
+// clients for secure, zero-trust networking between the service and GraphDB instances.
+//
+// Error Handling:
+// The function includes panic recovery to handle unexpected errors gracefully.
+// All temporary files are cleaned up, even when errors occur.
+//
+// Parameters:
+//   - task: The Task structure containing action type and repository details
+//   - files: Map of multipart file headers keyed by form field name (e.g., "task_0_config")
+//   - taskIndex: The index of this task in the request (used to look up files)
+//
+// Returns:
+//   - result: A map containing task results (action, status, message, etc.)
+//   - error: An error if the task fails, or nil on success
 func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex int) (map[string]interface{}, error) {
 	defer func() {
 		if r := recover(); r != nil {
