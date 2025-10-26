@@ -65,11 +65,17 @@ templ TaskResults(sessionID string, tasks []TaskStatus) {
 					}
 				});
 
+				const elapsed = Math.floor((Date.now() - startTime) / 1000);
+
 				if (allCompleted) {
-					const elapsed = Math.floor((Date.now() - startTime) / 1000);
 					document.getElementById('total-time').textContent = formatElapsedTime(elapsed);
+					// Stop the timer when all tasks are completed
+					if (timerInterval) {
+						clearInterval(timerInterval);
+						timerInterval = null;
+						console.log('All tasks completed. Final time:', formatElapsedTime(elapsed));
+					}
 				} else {
-					const elapsed = Math.floor((Date.now() - startTime) / 1000);
 					document.getElementById('total-time').textContent = formatElapsedTime(elapsed) + ' (in progress)';
 				}
 			}
@@ -89,7 +95,7 @@ templ TaskResults(sessionID string, tasks []TaskStatus) {
 			}
 
 			// Update total time every second
-			const timerInterval = setInterval(updateTotalTime, 1000);
+			let timerInterval = setInterval(updateTotalTime, 1000);
 
 			eventSource.addEventListener('task-update', function(e) {
 				console.log('Received task update:', e.data);
@@ -113,7 +119,10 @@ templ TaskResults(sessionID string, tasks []TaskStatus) {
 				console.error('SSE Error:', e);
 				if (eventSource.readyState === EventSource.CLOSED) {
 					console.log('SSE connection closed');
-					clearInterval(timerInterval);
+					if (timerInterval) {
+						clearInterval(timerInterval);
+						timerInterval = null;
+					}
 				}
 			};
 
@@ -126,7 +135,10 @@ templ TaskResults(sessionID string, tasks []TaskStatus) {
 				if (window.currentEventSource) {
 					window.currentEventSource.close();
 					window.currentEventSource = null;
+				}
+				if (timerInterval) {
 					clearInterval(timerInterval);
+					timerInterval = null;
 				}
 			});
 		})();
