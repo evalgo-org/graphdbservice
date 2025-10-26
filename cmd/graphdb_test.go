@@ -994,7 +994,7 @@ func TestUpdateRepositoryNameInConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	// Write test configuration
 	testConfig := `@prefix rep: <http://www.openrdf.org/config/repository#> .
@@ -1016,7 +1016,9 @@ repo:oldrepo a rep:Repository .
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("failed to close temp file: %v", err)
+	}
 
 	// Test the update function
 	err = updateRepositoryNameInConfig(tmpFile.Name(), "oldrepo", "newrepo")
