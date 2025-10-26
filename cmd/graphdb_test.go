@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"eve.evalgo.org/db"
+	"github.com/labstack/echo/v4"
 )
 
 // Test helper to create a mock GraphDB server
@@ -934,6 +936,307 @@ func TestApiKeyMiddleware(t *testing.T) {
 
 			if w.Code != tt.expectedStatus {
 				t.Errorf("expected status %d but got %d", tt.expectedStatus, w.Code)
+			}
+		})
+	}
+}
+
+// TestGetFileNames tests the getFileNames helper function
+func TestGetFileNames(t *testing.T) {
+	tests := []struct {
+		name     string
+		headers  []*multipart.FileHeader
+		expected []string
+	}{
+		{
+			name:     "empty list",
+			headers:  []*multipart.FileHeader{},
+			expected: []string{},
+		},
+		{
+			name: "single file",
+			headers: []*multipart.FileHeader{
+				{Filename: "test.ttl"},
+			},
+			expected: []string{"test.ttl"},
+		},
+		{
+			name: "multiple files",
+			headers: []*multipart.FileHeader{
+				{Filename: "test1.ttl"},
+				{Filename: "test2.nt"},
+				{Filename: "test3.rdf"},
+			},
+			expected: []string{"test1.ttl", "test2.nt", "test3.rdf"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getFileNames(tt.headers)
+			if len(result) != len(tt.expected) {
+				t.Errorf("expected %d filenames but got %d", len(tt.expected), len(result))
+				return
+			}
+			for i, name := range result {
+				if name != tt.expected[i] {
+					t.Errorf("expected filename %s at index %d but got %s", tt.expected[i], i, name)
+				}
+			}
+		})
+	}
+}
+
+// TestUpdateRepositoryNameInConfig tests the updateRepositoryNameInConfig function
+func TestUpdateRepositoryNameInConfig(t *testing.T) {
+	// Create a temporary test file
+	tmpFile, err := os.CreateTemp("", "repo-config-*.ttl")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	// Write test configuration
+	testConfig := `@prefix rep: <http://www.openrdf.org/config/repository#> .
+@prefix sr: <http://www.openrdf.org/config/repository/sail#> .
+@base <http://www.openrdf.org/config/repository#oldrepo> .
+
+[] a rep:Repository ;
+   rep:repositoryID "oldrepo" ;
+   rep:repositoryImpl [
+      rep:repositoryType "graphdb:SailRepository" ;
+      sr:sailImpl [
+         sail:sailType "graphdb:Sail" ;
+      ]
+   ] .
+
+repo:oldrepo a rep:Repository .
+`
+
+	if _, err := tmpFile.WriteString(testConfig); err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+	tmpFile.Close()
+
+	// Test the update function
+	err = updateRepositoryNameInConfig(tmpFile.Name(), "oldrepo", "newrepo")
+	if err != nil {
+		t.Fatalf("updateRepositoryNameInConfig failed: %v", err)
+	}
+
+	// Read the updated file
+	content, err := os.ReadFile(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("failed to read updated file: %v", err)
+	}
+
+	updatedConfig := string(content)
+
+	// Check that old name is replaced
+	if strings.Contains(updatedConfig, "oldrepo") {
+		t.Error("old repository name 'oldrepo' still found in config after update")
+	}
+
+	// Check that new name exists
+	if !strings.Contains(updatedConfig, "newrepo") {
+		t.Error("new repository name 'newrepo' not found in config after update")
+	}
+
+	// Check specific patterns
+	if !strings.Contains(updatedConfig, `rep:repositoryID "newrepo"`) {
+		t.Error("repositoryID not updated correctly")
+	}
+
+	if !strings.Contains(updatedConfig, "@base <http://www.openrdf.org/config/repository#newrepo>") {
+		t.Error("@base directive not updated correctly")
+	}
+}
+
+// TestGetGraphTripleCounts tests the getGraphTripleCounts function
+func TestGetGraphTripleCounts(t *testing.T) {
+	// Note: This is currently a stub function that returns -1, -1
+	oldCount, newCount := getGraphTripleCounts(
+		"http://localhost:7200",
+		"admin",
+		"password",
+		"test-repo",
+		"http://example.org/graph/old",
+		"http://example.org/graph/new",
+	)
+
+	if oldCount != -1 {
+		t.Errorf("expected oldCount -1 but got %d", oldCount)
+	}
+
+	if newCount != -1 {
+		t.Errorf("expected newCount -1 but got %d", newCount)
+	}
+}
+
+// TestGetRepositoryNames tests the getRepositoryNames function
+func TestGetRepositoryNames(t *testing.T) {
+	tests := []struct {
+		name     string
+		bindings []db.GraphDBBinding
+		expected []string
+	}{
+		{
+			name:     "empty bindings",
+			bindings: []db.GraphDBBinding{},
+			expected: []string{},
+		},
+		{
+			name: "single repository",
+			bindings: []db.GraphDBBinding{
+				{
+					Id: map[string]string{
+						"type":  "literal",
+						"value": "repo1",
+					},
+				},
+			},
+			expected: []string{"repo1"},
+		},
+		{
+			name: "multiple repositories",
+			bindings: []db.GraphDBBinding{
+				{
+					Id: map[string]string{
+						"type":  "literal",
+						"value": "repo1",
+					},
+				},
+				{
+					Id: map[string]string{
+						"type":  "literal",
+						"value": "repo2",
+					},
+				},
+				{
+					Id: map[string]string{
+						"type":  "literal",
+						"value": "repo3",
+					},
+				},
+			},
+			expected: []string{"repo1", "repo2", "repo3"},
+		},
+		{
+			name: "binding without value",
+			bindings: []db.GraphDBBinding{
+				{
+					Id: map[string]string{
+						"type": "literal",
+					},
+				},
+			},
+			expected: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getRepositoryNames(tt.bindings)
+			if len(result) != len(tt.expected) {
+				t.Errorf("expected %d names but got %d", len(tt.expected), len(result))
+				return
+			}
+			for i, name := range result {
+				if name != tt.expected[i] {
+					t.Errorf("expected name %s at index %d but got %s", tt.expected[i], i, name)
+				}
+			}
+		})
+	}
+}
+
+// TestMigrationHandlerJSON tests the migrationHandlerJSON function
+func TestMigrationHandlerJSON(t *testing.T) {
+	// Set up mock server
+	mockServer, cleanup := setupMockGraphDBServer(t)
+	defer cleanup()
+
+	// Set API key
+	_ = os.Setenv("API_KEY", "test-api-key")
+	defer func() { _ = os.Unsetenv("API_KEY") }()
+
+	tests := []struct {
+		name           string
+		requestBody    string
+		expectedStatus int
+		expectedInBody string
+	}{
+		{
+			name:           "invalid JSON",
+			requestBody:    `{"invalid json`,
+			expectedStatus: http.StatusBadRequest,
+			expectedInBody: "Invalid request format",
+		},
+		{
+			name:           "missing version",
+			requestBody:    `{"tasks": []}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedInBody: "Version is required",
+		},
+		{
+			name:           "missing tasks",
+			requestBody:    `{"version": "v0.0.1"}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedInBody: "At least one task is required",
+		},
+		{
+			name: "invalid action",
+			requestBody: `{
+				"version": "v0.0.1",
+				"tasks": [{
+					"action": "invalid-action",
+					"tgt": {
+						"url": "` + mockServer.URL + `",
+						"username": "admin",
+						"password": "password",
+						"repo": "test-repo"
+					}
+				}]
+			}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedInBody: "Invalid action",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/v1/api/action", strings.NewReader(tt.requestBody))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("x-api-key", "test-api-key")
+
+			w := httptest.NewRecorder()
+
+			// Create echo context
+			e := echo.New()
+			c := e.NewContext(req, w)
+
+			// Call handler
+			err := migrationHandlerJSON(c)
+
+			// Check status code
+			if err != nil {
+				// Echo handlers return errors that need to be checked
+				if he, ok := err.(*echo.HTTPError); ok {
+					if he.Code != tt.expectedStatus {
+						t.Errorf("expected status %d but got %d", tt.expectedStatus, he.Code)
+					}
+					if !strings.Contains(fmt.Sprint(he.Message), tt.expectedInBody) {
+						t.Errorf("expected body to contain %q but got %q", tt.expectedInBody, he.Message)
+					}
+				}
+			} else {
+				if w.Code != tt.expectedStatus {
+					t.Errorf("expected status %d but got %d", tt.expectedStatus, w.Code)
+				}
+				body := w.Body.String()
+				if !strings.Contains(body, tt.expectedInBody) {
+					t.Errorf("expected body to contain %q but got %q", tt.expectedInBody, body)
+				}
 			}
 		})
 	}
