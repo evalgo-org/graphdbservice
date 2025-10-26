@@ -45,7 +45,7 @@ func setupMockGraphDBServer(t *testing.T) (*httptest.Server, func()) {
 				},
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
+			_ = json.NewEncoder(w).Encode(response)
 		}
 	})
 
@@ -53,10 +53,10 @@ func setupMockGraphDBServer(t *testing.T) (*httptest.Server, func()) {
 	mux.HandleFunc("/rest/repositories/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/download-ttl") {
 			w.Header().Set("Content-Type", "text/turtle")
-			fmt.Fprint(w, "@prefix rep: <http://www.openrdf.org/config/repository#> .\n")
-			fmt.Fprint(w, "@prefix sr: <http://www.openrdf.org/config/repository/sail#> .\n")
-			fmt.Fprint(w, "[] a rep:Repository ;\n")
-			fmt.Fprint(w, "   rep:repositoryID \"test-repo\" .\n")
+			_, _ = fmt.Fprint(w, "@prefix rep: <http://www.openrdf.org/config/repository#> .\n")
+			_, _ = fmt.Fprint(w, "@prefix sr: <http://www.openrdf.org/config/repository/sail#> .\n")
+			_, _ = fmt.Fprint(w, "[] a rep:Repository ;\n")
+			_, _ = fmt.Fprint(w, "   rep:repositoryID \"test-repo\" .\n")
 		} else if r.Method == "DELETE" {
 			w.WriteHeader(http.StatusOK)
 		}
@@ -66,7 +66,7 @@ func setupMockGraphDBServer(t *testing.T) (*httptest.Server, func()) {
 	mux.HandleFunc("/rest/repositories", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
 			w.WriteHeader(http.StatusCreated)
-			fmt.Fprint(w, "Repository created successfully")
+			_, _ = fmt.Fprint(w, "Repository created successfully")
 		}
 	})
 
@@ -75,7 +75,7 @@ func setupMockGraphDBServer(t *testing.T) (*httptest.Server, func()) {
 		if r.Method == "GET" && r.Header.Get("Accept") == "application/x-binary-rdf" {
 			// Return mock BRF data
 			w.Header().Set("Content-Type", "application/x-binary-rdf")
-			w.Write([]byte{0x01, 0x02, 0x03, 0x04}) // Mock binary data
+			_, _ = w.Write([]byte{0x01, 0x02, 0x03, 0x04}) // Mock binary data
 		} else if r.Method == "POST" && r.Header.Get("Content-Type") == "application/x-binary-rdf" {
 			w.WriteHeader(http.StatusNoContent)
 		} else if r.Method == "POST" && r.Header.Get("Content-Type") == "application/sparql-update" {
@@ -100,21 +100,22 @@ func setupMockGraphDBServer(t *testing.T) (*httptest.Server, func()) {
 				},
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
+			_ = json.NewEncoder(w).Encode(response)
 		}
 	})
 
 	// Mock /repositories/{repo}/rdf-graphs/service endpoint
 	mux.HandleFunc("/repositories/test-repo/rdf-graphs/service", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" {
+		switch r.Method {
+		case "GET":
 			w.Header().Set("Content-Type", "application/rdf+xml")
-			fmt.Fprint(w, "<?xml version=\"1.0\"?>\n")
-			fmt.Fprint(w, "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n")
-			fmt.Fprint(w, "  <rdf:Description rdf:about=\"http://example.org/subject\">\n")
-			fmt.Fprint(w, "    <rdf:type rdf:resource=\"http://example.org/Type\"/>\n")
-			fmt.Fprint(w, "  </rdf:Description>\n")
-			fmt.Fprint(w, "</rdf:RDF>\n")
-		} else if r.Method == "PUT" {
+			_, _ = fmt.Fprint(w, "<?xml version=\"1.0\"?>\n")
+			_, _ = fmt.Fprint(w, "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n")
+			_, _ = fmt.Fprint(w, "  <rdf:Description rdf:about=\"http://example.org/subject\">\n")
+			_, _ = fmt.Fprint(w, "    <rdf:type rdf:resource=\"http://example.org/Type\"/>\n")
+			_, _ = fmt.Fprint(w, "  </rdf:Description>\n")
+			_, _ = fmt.Fprint(w, "</rdf:RDF>\n")
+		case "PUT":
 			w.WriteHeader(http.StatusNoContent)
 		}
 	})
@@ -216,7 +217,7 @@ func TestGraphDBRepositoryConf(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filename, err := db.GraphDBRepositoryConf(tt.url, tt.user, tt.pass, tt.repo)
-			defer os.Remove(filename) // Cleanup
+			defer func() { _ = os.Remove(filename) }() // Cleanup
 
 			if tt.expectError && err == nil {
 				t.Errorf("expected error but got none")
@@ -276,7 +277,7 @@ func TestGraphDBRepositoryBrf(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filename, err := db.GraphDBRepositoryBrf(tt.url, tt.user, tt.pass, tt.repo)
-			defer os.Remove(filename) // Cleanup
+			defer func() { _ = os.Remove(filename) }() // Cleanup
 
 			if tt.expectError && err == nil {
 				t.Errorf("expected error but got none")
@@ -392,7 +393,7 @@ func TestGraphDBExportGraphRdf(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := db.GraphDBExportGraphRdf(tt.url, tt.user, tt.pass, tt.repo, tt.graph, tt.exportFile)
-			defer os.Remove(tt.exportFile) // Cleanup
+			defer func() { _ = os.Remove(tt.exportFile) }() // Cleanup
 
 			if tt.expectError && err == nil {
 				t.Errorf("expected error but got none")
@@ -439,8 +440,8 @@ func TestGraphDBImportGraphRdf(t *testing.T) {
     <rdf:type rdf:resource="http://example.org/Type"/>
   </rdf:Description>
 </rdf:RDF>`
-	os.WriteFile(tempFile, []byte(rdfContent), 0644)
-	defer os.Remove(tempFile)
+	_ = os.WriteFile(tempFile, []byte(rdfContent), 0644)
+	defer func() { _ = os.Remove(tempFile) }()
 
 	tests := []struct {
 		name        string
@@ -581,8 +582,8 @@ func TestGraphDBRestoreConf(t *testing.T) {
 
 [] a rep:Repository ;
    rep:repositoryID "test-repo" .`
-	os.WriteFile(tempFile, []byte(ttlContent), 0644)
-	defer os.Remove(tempFile)
+	_ = os.WriteFile(tempFile, []byte(ttlContent), 0644)
+	defer func() { _ = os.Remove(tempFile) }()
 
 	tests := []struct {
 		name        string
@@ -629,8 +630,8 @@ func TestGraphDBRestoreBrf(t *testing.T) {
 	// Create a temporary BRF file
 	tempFile := "/tmp/test-repo.brf"
 	brfContent := []byte{0x01, 0x02, 0x03, 0x04}
-	os.WriteFile(tempFile, brfContent, 0644)
-	defer os.Remove(tempFile)
+	_ = os.WriteFile(tempFile, brfContent, 0644)
+	defer func() { _ = os.Remove(tempFile) }()
 
 	tests := []struct {
 		name        string
@@ -884,12 +885,12 @@ func TestApiKeyMiddleware(t *testing.T) {
 	// Create a test handler
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, "success")
+		_, _ = io.WriteString(w, "success")
 	}
 
 	// Set environment variable for API key
-	os.Setenv("API_KEY", "test-api-key")
-	defer os.Unsetenv("API_KEY")
+	_ = os.Setenv("API_KEY", "test-api-key")
+	defer func() { _ = os.Unsetenv("API_KEY") }()
 
 	tests := []struct {
 		name           string

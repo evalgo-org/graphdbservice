@@ -31,5 +31,5 @@ import "evalgo.org/graphservice/cmd"
 
 // main is the application entry point that delegates to the cobra command structure.
 func main() {
-	cmd.Execute()
+	_ = cmd.Execute()
 }

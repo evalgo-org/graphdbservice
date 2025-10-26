@@ -75,7 +75,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&userLicense, "license", "l", "", "name of license for the project")
 
 	// Bind flags to viper configuration
-	viper.BindPFlag("author", rootCmd.PersistentFlags().Lookup("author"))
+	_ = viper.BindPFlag("author", rootCmd.PersistentFlags().Lookup("author"))
 
 	// Set default configuration values
 	viper.SetDefault("author", "Francisc Simon <francisc.simon@pantopix.com>")

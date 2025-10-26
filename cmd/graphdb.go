@@ -5,13 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
-	"log"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"strings"
 	"time"
 
@@ -263,7 +260,7 @@ func migrationHandlerMultipart(c echo.Context) error {
 	defer func() {
 		if form != nil {
 			fmt.Println("DEBUG: Cleaning up multipart form")
-			form.RemoveAll()
+			_ = form.RemoveAll()
 		}
 	}()
 
@@ -406,8 +403,8 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		}
 	}()
 
-	var srcClient *http.Client = http.DefaultClient
-	var tgtClient *http.Client = http.DefaultClient
+	srcClient := http.DefaultClient
+	tgtClient := http.DefaultClient
 
 	fmt.Printf("DEBUG: Processing task action: %s\n", task.Action)
 
@@ -482,8 +479,8 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		if err != nil {
 			return nil, err
 		}
-		os.Remove(confFile)
-		os.Remove(dataFile)
+		_ = os.Remove(confFile)
+		_ = os.Remove(dataFile)
 		result["message"] = "Repository migrated successfully"
 		result["src_repo"] = task.Src.Repo
 		result["tgt_repo"] = task.Tgt.Repo
@@ -569,7 +566,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		if !foundRepo {
 			return nil, errors.New("could not find required tgt repository " + task.Tgt.Repo)
 		}
-		os.Remove(graphFile) // Clean up temporary file
+		_ = os.Remove(graphFile) // Clean up temporary file
 		result["message"] = "Graph migrated successfully"
 		result["src_graph"] = task.Src.Graph
 		result["tgt_graph"] = task.Tgt.Graph
@@ -698,7 +695,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 			}
 
 			// Clean up the temporary BRF file
-			os.Remove(dataFile)
+			_ = os.Remove(dataFile)
 
 			result["message"] = "Repository import completed successfully"
 			result["source_repository"] = task.Src.Repo
@@ -715,23 +712,23 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 					if err != nil {
 						return nil, fmt.Errorf("failed to open file %s: %w", fileHeader.Filename, err)
 					}
-					defer file.Close()
+					defer func() { _ = file.Close() }()
 
 					// Save file temporarily
 					tempFileName := fmt.Sprintf("/tmp/%s", fileHeader.Filename)
-					defer os.Remove(tempFileName)
+					defer func() { _ = os.Remove(tempFileName) }()
 
 					tempFile, err := os.Create(tempFileName)
 					if err != nil {
 						return nil, fmt.Errorf("failed to create temp file: %w", err)
 					}
-					defer tempFile.Close()
+					defer func() { _ = tempFile.Close() }()
 
 					_, err = tempFile.ReadFrom(file)
 					if err != nil {
 						return nil, fmt.Errorf("failed to copy file: %w", err)
 					}
-					tempFile.Close()
+					_ = tempFile.Close()
 
 					// Import the BRF file
 					fmt.Printf("DEBUG: Importing BRF file %s to repository %s\n", fileHeader.Filename, task.Tgt.Repo)
@@ -794,17 +791,17 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		if err != nil {
 			return nil, fmt.Errorf("failed to open config file %s: %w", fileHeader.Filename, err)
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		// Save uploaded config to temporary file
 		configFile := fmt.Sprintf("/tmp/repo_create_%s_%s", md5Hash(repoName), fileHeader.Filename)
-		defer os.Remove(configFile)
+		defer func() { _ = os.Remove(configFile) }()
 
 		tempFile, err := os.Create(configFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create temp config file: %w", err)
 		}
-		defer tempFile.Close()
+		defer func() { _ = tempFile.Close() }()
 
 		// Copy uploaded file to temp file
 		if _, err := file.Seek(0, 0); err != nil {
@@ -813,7 +810,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		if _, err := tempFile.ReadFrom(file); err != nil {
 			return nil, fmt.Errorf("failed to copy config file: %w", err)
 		}
-		tempFile.Close()
+		_ = tempFile.Close()
 
 		// Update the repository name in config file to match the requested name
 		err = updateRepositoryNameInConfig(configFile, "PLACEHOLDER", repoName)
@@ -965,7 +962,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 							fmt.Printf("ERROR: Failed to open file %s: %v\n", fileHeader.Filename, err)
 							return
 						}
-						defer file.Close()
+						defer func() { _ = file.Close() }()
 
 						// Save file temporarily and import it
 						tempFileName := fmt.Sprintf("/tmp/%s", fileHeader.Filename)
@@ -976,10 +973,10 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 							fmt.Printf("ERROR: Failed to create temp file: %v\n", err)
 							return
 						}
-						defer tempFile.Close()
+						defer func() { _ = tempFile.Close() }()
 						defer func() {
 							fmt.Printf("DEBUG: Removing temp file: %s\n", tempFileName)
-							os.Remove(tempFileName)
+							_ = os.Remove(tempFileName)
 						}()
 
 						// Copy uploaded file to temp file
@@ -994,7 +991,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 							fmt.Printf("ERROR: Failed to copy file: %v\n", err)
 							return
 						}
-						tempFile.Close()
+						_ = tempFile.Close()
 
 						fmt.Printf("DEBUG: Copied %d bytes to temp file\n", bytesWritten)
 
@@ -1078,7 +1075,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		if err != nil {
 			return nil, fmt.Errorf("failed to backup configuration for repository '%s': %w", oldRepoName, err)
 		}
-		defer os.Remove(confFile) // Clean up config file
+		defer func() { _ = os.Remove(confFile) }() // Clean up config file
 
 		// Step 5: Export each graph individually
 		graphBackups := make(map[string]string) // map[graphURI]fileName
@@ -1102,7 +1099,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 			// Verify the export file was created and has content
 			if fileInfo, err := os.Stat(graphFileName); err != nil || fileInfo.Size() == 0 {
 				graphExportErrors = append(graphExportErrors, fmt.Sprintf("graph '%s' export file is empty or missing", graphURI))
-				os.Remove(graphFileName) // Clean up empty file
+				_ = os.Remove(graphFileName) // Clean up empty file
 				continue
 			}
 
@@ -1112,7 +1109,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		// Clean up graph backup files when done
 		defer func() {
 			for _, fileName := range graphBackups {
-				os.Remove(fileName)
+				_ = os.Remove(fileName)
 			}
 		}()
 
@@ -1149,7 +1146,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		// Step 9: Verify that graphs were imported successfully
 		if successfulImports == 0 && len(graphBackups) > 0 {
 			// If no graphs were imported, clean up the new repository
-			db.GraphDBDeleteRepository(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, newRepoName)
+			_ = db.GraphDBDeleteRepository(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, newRepoName)
 			return nil, fmt.Errorf("failed to import any graphs to new repository: %s", strings.Join(graphImportErrors, "; "))
 		}
 
@@ -1249,7 +1246,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 
 		// Step 3: Export the old graph to a temporary file
 		tempFileName := fmt.Sprintf("/tmp/graph_rename_%s.rdf", md5Hash(oldGraphName))
-		defer os.Remove(tempFileName) // Clean up temporary file
+		defer func() { _ = os.Remove(tempFileName) }() // Clean up temporary file
 
 		err = db.GraphDBExportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, repoName, oldGraphName, tempFileName)
 		if err != nil {
@@ -1322,19 +1319,6 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 func init() {
 	rootCmd.AddCommand(graphdbCmd)
 	graphdbCmd.Flags().String("identity", "", "identity to authenticate to an ziti network")
-}
-
-func listFiles(dir string, ext string) []string {
-	root := os.DirFS(dir)
-	mdFiles, err := fs.Glob(root, "*."+ext)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var files []string
-	for _, v := range mdFiles {
-		files = append(files, path.Join(dir, v))
-	}
-	return files
 }
 
 var graphdbCmd = &cobra.Command{
