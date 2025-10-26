@@ -179,7 +179,11 @@ func uiStreamHandler(c echo.Context) error {
 				return err
 			}
 			fmt.Fprintf(c.Response().Writer, "\n\n")
-			c.Response().Flush()
+
+			// Flush if the response writer supports it
+			if flusher, ok := c.Response().Writer.(http.Flusher); ok {
+				flusher.Flush()
+			}
 
 		case <-c.Request().Context().Done():
 			return nil

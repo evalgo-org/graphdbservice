@@ -1653,9 +1653,13 @@ var graphdbCmd = &cobra.Command{
 		// Add request size limit (100MB)
 		e.Use(middleware.BodyLimit("100M"))
 
-		// Add timeout middleware
+		// Add timeout middleware (skip SSE endpoints)
 		e.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
 			Timeout: 300 * time.Second, // 5 minutes
+			Skipper: func(c echo.Context) bool {
+				// Skip timeout for SSE stream endpoints
+				return c.Path() == "/ui/stream/:sessionID"
+			},
 		}))
 
 		// Enable CORS
