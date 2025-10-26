@@ -447,8 +447,15 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		for _, bind := range srcGraphDB.Results.Bindings {
 			if bind.Id["value"] == task.Src.Repo {
 				foundRepo = true
-				confFile = db.GraphDBRepositoryConf(task.Src.URL, task.Src.Username, task.Src.Password, bind.Id["value"])
-				dataFile = db.GraphDBRepositoryBrf(task.Src.URL, task.Src.Username, task.Src.Password, bind.Id["value"])
+				var err error
+				confFile, err = db.GraphDBRepositoryConf(task.Src.URL, task.Src.Username, task.Src.Password, bind.Id["value"])
+				if err != nil {
+					return nil, fmt.Errorf("failed to download repository config: %w", err)
+				}
+				dataFile, err = db.GraphDBRepositoryBrf(task.Src.URL, task.Src.Username, task.Src.Password, bind.Id["value"])
+				if err != nil {
+					return nil, fmt.Errorf("failed to download repository data: %w", err)
+				}
 			}
 		}
 		if !foundRepo {
@@ -671,7 +678,11 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 			for _, bind := range srcGraphDB.Results.Bindings {
 				if bind.Id["value"] == task.Src.Repo {
 					srcFoundRepo = true
-					dataFile = db.GraphDBRepositoryBrf(task.Src.URL, task.Src.Username, task.Src.Password, bind.Id["value"])
+					var err error
+					dataFile, err = db.GraphDBRepositoryBrf(task.Src.URL, task.Src.Username, task.Src.Password, bind.Id["value"])
+					if err != nil {
+						return nil, fmt.Errorf("failed to download repository data: %w", err)
+					}
 					break
 				}
 			}
@@ -1063,9 +1074,9 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		}
 		
 		// Step 4: Create backup of repository configuration
-		confFile := db.GraphDBRepositoryConf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, oldRepoName)
-		if confFile == "" {
-			return nil, fmt.Errorf("failed to backup configuration for repository '%s'", oldRepoName)
+		confFile, err := db.GraphDBRepositoryConf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, oldRepoName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to backup configuration for repository '%s': %w", oldRepoName, err)
 		}
 		defer os.Remove(confFile) // Clean up config file
 		
