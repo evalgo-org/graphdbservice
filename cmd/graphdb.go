@@ -1669,10 +1669,18 @@ var graphdbCmd = &cobra.Command{
 		e.Use(middleware.Recover())
 		// Apply API key middleware and register the migration handler
 		e.POST("/v1/api/action", migrationHandler, apiKeyMiddleware)
+
 		// Health check endpoint (without API key requirement)
 		e.GET("/health", func(c echo.Context) error {
 			return c.JSON(http.StatusOK, map[string]string{"status": "healthy"})
 		})
+
+		// Web UI routes (without API key requirement)
+		e.GET("/", uiIndexHandler)
+		e.GET("/ui", uiIndexHandler)
+		e.POST("/ui/execute", uiExecuteHandler)
+		e.GET("/ui/stream/:sessionID", uiStreamHandler)
+
 		port := os.Getenv("PORT")
 		if port == "" {
 			port = "8080"

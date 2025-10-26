@@ -1,0 +1,75 @@
+package templates
+
+type TaskStatus struct {
+	Index    int
+	Action   string
+	Status   string // pending, in-progress, success, error, timeout
+	Message  string
+	SrcRepo  string
+	TgtRepo  string
+	SrcGraph string
+	TgtGraph string
+}
+
+templ TaskResults(sessionID string, tasks []TaskStatus) {
+	<div class="card">
+		<h2>Task Execution Progress</h2>
+		<div
+			hx-ext="sse"
+			sse-connect={ "/ui/stream/" + sessionID }
+			sse-swap="task-update"
+			hx-swap="none"
+		>
+			<ul class="task-list" id="task-list">
+				for _, task := range tasks {
+					@TaskItem(task)
+				}
+			</ul>
+		</div>
+	</div>
+}
+
+templ TaskItem(task TaskStatus) {
+	<li class={ "task-item", task.Status } id={ "task-" + string(rune(task.Index)) } data-index={ string(rune(task.Index + 48)) }>
+		<div class="task-header">
+			<span class="task-action">
+				Task { string(rune(task.Index + 49)) }: { task.Action }
+			</span>
+			<span class={ "task-status", task.Status }>
+				if task.Status == "in-progress" {
+					<span class="spinner"></span>
+				}
+				{ task.Status }
+			</span>
+		</div>
+
+		<div class="task-details">
+			if task.SrcRepo != "" {
+				<div>
+					Source: { task.SrcRepo }
+					if task.SrcGraph != "" {
+						{ " / " + task.SrcGraph }
+					}
+				</div>
+			}
+			if task.TgtRepo != "" {
+				<div>
+					Target: { task.TgtRepo }
+					if task.TgtGraph != "" {
+						{ " / " + task.TgtGraph }
+					}
+				</div>
+			}
+		</div>
+
+		if task.Message != "" {
+			<div class="task-message">
+				{ task.Message }
+			</div>
+		}
+	</li>
+}
+
+templ TaskUpdate(task TaskStatus) {
+	@TaskItem(task)
+}

@@ -82,6 +82,12 @@ tasks:
     cmds:
       - go fmt ./...
 
+  templ:generate:
+    desc: Generate Go code from Templ templates
+    cmds:
+      - templ generate
+      - echo "Templ templates generated successfully"
+
   vet:
     desc: Run Go vet
     cmds:
