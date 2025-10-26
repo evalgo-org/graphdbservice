@@ -31,8 +31,10 @@ variables:
   image: golang:${GO_VERSION}
   extends: .go-cache
   before_script:
-    # Install task-runner
-    - sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin v${TASK_VERSION}
+    # Install task-runner to local bin
+    - mkdir -p $HOME/bin
+    - sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b $HOME/bin v${TASK_VERSION}
+    - export PATH=$HOME/bin:$PATH
     # Verify installation
     - go version
     - task --version
@@ -106,9 +108,11 @@ quality:lint:
   stage: quality
   extends: .go-base
   before_script:
-    - sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin v${TASK_VERSION}
-    - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
-    - export PATH=$PATH:$(go env GOPATH)/bin
+    - mkdir -p $HOME/bin
+    - sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b $HOME/bin v${TASK_VERSION}
+    - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $HOME/bin
+    - export PATH=$HOME/bin:$PATH
+    - go mod download
   script:
     - echo "Running golangci-lint..."
     - task lint
