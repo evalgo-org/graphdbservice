@@ -1,14 +1,19 @@
 package templates
 
 type TaskStatus struct {
-	Index    int
-	Action   string
-	Status   string // pending, in-progress, success, error, timeout
-	Message  string
-	SrcRepo  string
-	TgtRepo  string
-	SrcGraph string
-	TgtGraph string
+	Index     int
+	Action    string
+	Status    string // pending, in-progress, success, error, timeout
+	Message   string
+	SrcRepo   string
+	TgtRepo   string
+	SrcGraph  string
+	TgtGraph  string
+	SrcURL    string
+	TgtURL    string
+	StartTime string
+	EndTime   string
+	Duration  string
 }
 
 templ TaskResults(sessionID string, tasks []TaskStatus) {
@@ -20,6 +25,10 @@ templ TaskResults(sessionID string, tasks []TaskStatus) {
 					@TaskItem(task)
 				}
 			</ul>
+			<div id="execution-summary" class="execution-summary">
+				<div><strong>Total Tasks:</strong> <span id="total-tasks">{ string(rune(len(tasks) + 48)) }</span></div>
+				<div><strong>Total Time:</strong> <span id="total-time">Calculating...</span></div>
+			</div>
 		</div>
 	</div>
 	<script>
@@ -34,11 +43,53 @@ templ TaskResults(sessionID string, tasks []TaskStatus) {
 			const container = document.getElementById('sse-container');
 			const sessionID = container.getAttribute('data-session-id');
 			const eventSource = new EventSource('/ui/stream/' + sessionID);
+			const startTime = Date.now();
 
 			// Store in global variable for cleanup
 			window.currentEventSource = eventSource;
 
 			console.log('Connecting to SSE stream:', '/ui/stream/' + sessionID);
+
+			// Function to update total execution time
+			function updateTotalTime() {
+				const tasks = document.querySelectorAll('.task-item');
+				let allCompleted = true;
+				let totalDuration = 0;
+
+				tasks.forEach(task => {
+					const status = task.classList.contains('success') ||
+					               task.classList.contains('error') ||
+					               task.classList.contains('timeout');
+					if (!status) {
+						allCompleted = false;
+					}
+				});
+
+				if (allCompleted) {
+					const elapsed = Math.floor((Date.now() - startTime) / 1000);
+					document.getElementById('total-time').textContent = formatElapsedTime(elapsed);
+				} else {
+					const elapsed = Math.floor((Date.now() - startTime) / 1000);
+					document.getElementById('total-time').textContent = formatElapsedTime(elapsed) + ' (in progress)';
+				}
+			}
+
+			function formatElapsedTime(seconds) {
+				if (seconds < 60) {
+					return seconds + 's';
+				}
+				const minutes = Math.floor(seconds / 60);
+				const secs = seconds % 60;
+				if (minutes < 60) {
+					return minutes + 'm ' + secs + 's';
+				}
+				const hours = Math.floor(minutes / 60);
+				const mins = minutes % 60;
+				return hours + 'h ' + mins + 'm ' + secs + 's';
+			}
+
+			// Update total time every second
+			const timerInterval = setInterval(updateTotalTime, 1000);
 
 			eventSource.addEventListener('task-update', function(e) {
 				console.log('Received task update:', e.data);
@@ -53,6 +104,7 @@ templ TaskResults(sessionID string, tasks []TaskStatus) {
 					if (existingTask) {
 						existingTask.outerHTML = newTask.outerHTML;
 						console.log('Updated task at index:', taskIndex);
+						updateTotalTime();
 					}
 				}
 			});
@@ -61,6 +113,7 @@ templ TaskResults(sessionID string, tasks []TaskStatus) {
 				console.error('SSE Error:', e);
 				if (eventSource.readyState === EventSource.CLOSED) {
 					console.log('SSE connection closed');
+					clearInterval(timerInterval);
 				}
 			};
 
@@ -73,6 +126,7 @@ templ TaskResults(sessionID string, tasks []TaskStatus) {
 				if (window.currentEventSource) {
 					window.currentEventSource.close();
 					window.currentEventSource = null;
+					clearInterval(timerInterval);
 				}
 			});
 		})();
@@ -94,20 +148,31 @@ templ TaskItem(task TaskStatus) {
 		</div>
 
 		<div class="task-details">
-			if task.SrcRepo != "" {
+			if task.SrcURL != "" {
 				<div>
-					Source: { task.SrcRepo }
-					if task.SrcGraph != "" {
-						{ " / " + task.SrcGraph }
+					<strong>Source:</strong> { task.SrcURL }
+					if task.SrcRepo != "" {
+						{ " → " + task.SrcRepo }
+						if task.SrcGraph != "" {
+							{ " / " + task.SrcGraph }
+						}
 					}
 				</div>
 			}
-			if task.TgtRepo != "" {
+			if task.TgtURL != "" {
 				<div>
-					Target: { task.TgtRepo }
-					if task.TgtGraph != "" {
-						{ " / " + task.TgtGraph }
+					<strong>Target:</strong> { task.TgtURL }
+					if task.TgtRepo != "" {
+						{ " → " + task.TgtRepo }
+						if task.TgtGraph != "" {
+							{ " / " + task.TgtGraph }
+						}
 					}
+				</div>
+			}
+			if task.Duration != "" {
+				<div>
+					<strong>Duration:</strong> { task.Duration }
 				</div>
 			}
 		</div>

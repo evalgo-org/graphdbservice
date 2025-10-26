@@ -94,10 +94,12 @@ func uiExecuteHandler(c echo.Context) error {
 		if task.Src != nil {
 			session.Tasks[i].SrcRepo = task.Src.Repo
 			session.Tasks[i].SrcGraph = task.Src.Graph
+			session.Tasks[i].SrcURL = task.Src.URL
 		}
 		if task.Tgt != nil {
 			session.Tasks[i].TgtRepo = task.Tgt.Repo
 			session.Tasks[i].TgtGraph = task.Tgt.Graph
+			session.Tasks[i].TgtURL = task.Tgt.URL
 		}
 	}
 
@@ -197,10 +199,14 @@ func executeTasksWithUpdates(sessionID string, req MigrationRequest) {
 
 	// Execute each task
 	for i, task := range req.Tasks {
+		// Record start time
+		taskStartTime := time.Now()
+
 		// Update status to in-progress
 		session.mutex.Lock()
 		session.Tasks[i].Status = "in-progress"
 		session.Tasks[i].Message = "Executing..."
+		session.Tasks[i].StartTime = taskStartTime.Format("15:04:05")
 		taskUpdate := session.Tasks[i]
 		session.mutex.Unlock()
 
@@ -209,9 +215,14 @@ func executeTasksWithUpdates(sessionID string, req MigrationRequest) {
 
 		// Validate task
 		if err := validateTask(task); err != nil {
+			taskEndTime := time.Now()
+			duration := taskEndTime.Sub(taskStartTime)
+
 			session.mutex.Lock()
 			session.Tasks[i].Status = "error"
 			session.Tasks[i].Message = fmt.Sprintf("Validation failed: %v", err)
+			session.Tasks[i].EndTime = taskEndTime.Format("15:04:05")
+			session.Tasks[i].Duration = formatDuration(duration)
 			taskUpdate = session.Tasks[i]
 			session.mutex.Unlock()
 
@@ -236,6 +247,9 @@ func executeTasksWithUpdates(sessionID string, req MigrationRequest) {
 		// Wait for result or timeout
 		select {
 		case res := <-resultChan:
+			taskEndTime := time.Now()
+			duration := taskEndTime.Sub(taskStartTime)
+
 			session.mutex.Lock()
 			if res.err != nil {
 				session.Tasks[i].Status = "error"
@@ -248,13 +262,20 @@ func executeTasksWithUpdates(sessionID string, req MigrationRequest) {
 					session.Tasks[i].Message = "Task completed successfully"
 				}
 			}
+			session.Tasks[i].EndTime = taskEndTime.Format("15:04:05")
+			session.Tasks[i].Duration = formatDuration(duration)
 			taskUpdate = session.Tasks[i]
 			session.mutex.Unlock()
 
 		case <-time.After(10 * time.Minute): // 10 minute timeout per task
+			taskEndTime := time.Now()
+			duration := taskEndTime.Sub(taskStartTime)
+
 			session.mutex.Lock()
 			session.Tasks[i].Status = "timeout"
 			session.Tasks[i].Message = "Task timed out after 10 minutes"
+			session.Tasks[i].EndTime = taskEndTime.Format("15:04:05")
+			session.Tasks[i].Duration = formatDuration(duration)
 			taskUpdate = session.Tasks[i]
 			session.mutex.Unlock()
 		}
@@ -289,4 +310,22 @@ func broadcastTaskUpdate(session *TaskSession, task templates.TaskStatus) {
 			// Client buffer full, skip
 		}
 	}
+}
+
+// formatDuration formats a duration into a human-readable string
+func formatDuration(d time.Duration) string {
+	if d < time.Second {
+		return fmt.Sprintf("%dms", d.Milliseconds())
+	}
+	if d < time.Minute {
+		return fmt.Sprintf("%.1fs", d.Seconds())
+	}
+	minutes := int(d.Minutes())
+	seconds := int(d.Seconds()) % 60
+	if d < time.Hour {
+		return fmt.Sprintf("%dm %ds", minutes, seconds)
+	}
+	hours := int(d.Hours())
+	minutes = minutes % 60
+	return fmt.Sprintf("%dh %dm %ds", hours, minutes, seconds)
 }
