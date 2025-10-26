@@ -61,6 +61,7 @@ test:unit:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "service"'
     - if: '$CI_COMMIT_TAG'
 
 # Verbose Tests with Race Detection
@@ -73,6 +74,7 @@ test:race:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "service"'
   allow_failure: false
 
 # Code Formatting Check
@@ -85,6 +87,7 @@ quality:fmt:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "service"'
 
 # Go Vet Check
 quality:vet:
@@ -96,6 +99,7 @@ quality:vet:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "service"'
 
 # Linting (Optional - requires golangci-lint)
 quality:lint:
@@ -111,6 +115,7 @@ quality:lint:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "service"'
   allow_failure: true
 
 # Build Binary
@@ -127,6 +132,7 @@ build:binary:
     expire_in: 1 week
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "service"'
     - if: '$CI_COMMIT_TAG'
 
 # Build Versioned Binary with Build Info
@@ -173,6 +179,7 @@ ci:full:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: manual
     - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "service"'
       when: manual
   allow_failure: false
 
