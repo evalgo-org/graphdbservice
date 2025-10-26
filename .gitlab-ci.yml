@@ -35,6 +35,8 @@ variables:
     - mkdir -p $HOME/bin
     - sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b $HOME/bin v${TASK_VERSION}
     - export PATH=$HOME/bin:$PATH
+    # Allow Go to download the correct toolchain version
+    - export GOTOOLCHAIN=auto
     # Verify installation
     - go version
     - task --version
@@ -112,6 +114,7 @@ quality:lint:
     - sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b $HOME/bin v${TASK_VERSION}
     - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $HOME/bin
     - export PATH=$HOME/bin:$PATH
+    - export GOTOOLCHAIN=auto
     - go mod download
   script:
     - echo "Running golangci-lint..."
