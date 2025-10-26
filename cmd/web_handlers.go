@@ -173,12 +173,18 @@ func uiStreamHandler(c echo.Context) error {
 			component := templates.TaskUpdate(task)
 
 			// Write SSE message
-			fmt.Fprintf(c.Response().Writer, "event: task-update\n")
-			fmt.Fprintf(c.Response().Writer, "data: ")
+			if _, err := fmt.Fprintf(c.Response().Writer, "event: task-update\n"); err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintf(c.Response().Writer, "data: "); err != nil {
+				return err
+			}
 			if err := component.Render(c.Request().Context(), c.Response().Writer); err != nil {
 				return err
 			}
-			fmt.Fprintf(c.Response().Writer, "\n\n")
+			if _, err := fmt.Fprintf(c.Response().Writer, "\n\n"); err != nil {
+				return err
+			}
 
 			// Flush if the response writer supports it
 			if flusher, ok := c.Response().Writer.(http.Flusher); ok {
