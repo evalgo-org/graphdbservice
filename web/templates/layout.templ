@@ -6,21 +6,27 @@ templ Layout(title string) {
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-			<title>{ title } - GraphDB Service</title>
+			<title>{ title } - Pantopix GraphDB Service</title>
 			<script src="https://unpkg.com/htmx.org@1.9.10"></script>
 			<script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
 			<style>
+				@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Noto+Serif+JP:wght@400;600;700&display=swap');
+
 				:root {
-					--primary: #2563eb;
+					--primary: #f05a28;
+					--primary-dark: #d94d21;
 					--success: #10b981;
 					--warning: #f59e0b;
 					--error: #ef4444;
-					--gray-100: #f3f4f6;
+					--text-primary: #334f74;
+					--text-secondary: #849d96;
+					--text-dark: #000429;
+					--gray-100: #eeeeee;
 					--gray-200: #e5e7eb;
 					--gray-300: #d1d5db;
-					--gray-700: #374151;
-					--gray-800: #1f2937;
-					--gray-900: #111827;
+					--gray-700: #3a3a3a;
+					--gray-800: #334f74;
+					--gray-900: #000429;
 				}
 
 				* {
@@ -30,9 +36,10 @@ templ Layout(title string) {
 				}
 
 				body {
-					font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+					font-family: "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+					font-weight: 300;
 					line-height: 1.6;
-					color: var(--gray-900);
+					color: var(--text-primary);
 					background: var(--gray-100);
 				}
 
@@ -47,17 +54,20 @@ templ Layout(title string) {
 					border-bottom: 1px solid var(--gray-200);
 					padding: 1.5rem 0;
 					margin-bottom: 2rem;
+					box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 				}
 
 				header h1 {
+					font-family: "Noto Serif JP", serif;
 					font-size: 1.875rem;
-					font-weight: 700;
-					color: var(--gray-900);
+					font-weight: 600;
+					color: var(--text-primary);
 				}
 
 				header p {
-					color: var(--gray-700);
+					color: var(--text-secondary);
 					margin-top: 0.25rem;
+					font-weight: 300;
 				}
 
 				.card {
@@ -69,10 +79,11 @@ templ Layout(title string) {
 				}
 
 				.card h2 {
+					font-family: "Noto Serif JP", serif;
 					font-size: 1.25rem;
 					font-weight: 600;
 					margin-bottom: 1rem;
-					color: var(--gray-900);
+					color: var(--text-primary);
 				}
 
 				textarea {
@@ -89,7 +100,7 @@ templ Layout(title string) {
 				textarea:focus {
 					outline: none;
 					border-color: var(--primary);
-					box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+					box-shadow: 0 0 0 3px rgba(240, 90, 40, 0.1);
 				}
 
 				button {
@@ -99,13 +110,16 @@ templ Layout(title string) {
 					border: none;
 					border-radius: 0.375rem;
 					font-size: 1rem;
-					font-weight: 500;
+					font-weight: 400;
+					text-transform: uppercase;
+					letter-spacing: 0.5px;
 					cursor: pointer;
 					transition: background 0.2s;
+					font-family: "Lato", sans-serif;
 				}
 
 				button:hover {
-					background: #1d4ed8;
+					background: var(--primary-dark);
 				}
 
 				button:disabled {
@@ -131,7 +145,7 @@ templ Layout(title string) {
 				}
 
 				.task-item.in-progress {
-					background: #dbeafe;
+					background: #fff3ed;
 					border-color: var(--primary);
 					border-left-width: 4px;
 				}
@@ -162,8 +176,10 @@ templ Layout(title string) {
 				}
 
 				.task-action {
+					font-family: "Noto Serif JP", serif;
 					font-weight: 600;
 					font-size: 1rem;
+					color: var(--text-primary);
 				}
 
 				.task-status {
@@ -235,9 +251,12 @@ templ Layout(title string) {
 					text-decoration: none;
 					font-size: 0.875rem;
 					cursor: pointer;
+					font-weight: 400;
+					transition: color 0.2s;
 				}
 
 				.example-link:hover {
+					color: var(--primary-dark);
 					text-decoration: underline;
 				}
 
@@ -260,22 +279,24 @@ templ Layout(title string) {
 				.execution-summary {
 					margin-top: 1.5rem;
 					padding: 1rem;
-					background: var(--gray-100);
+					background: #f9f9f9;
 					border-radius: 0.375rem;
+					border: 1px solid var(--gray-200);
 					display: flex;
 					gap: 2rem;
 					font-size: 0.875rem;
 				}
 
 				.execution-summary strong {
-					color: var(--gray-900);
+					color: var(--text-primary);
+					font-weight: 600;
 				}
 			</style>
 		</head>
 		<body>
 			<header>
 				<div class="container">
-					<h1>GraphDB Migration Service</h1>
+					<h1>Pantopix GraphDB Service</h1>
 					<p>Execute and monitor GraphDB repository and graph operations</p>
 				</div>
 			</header>
