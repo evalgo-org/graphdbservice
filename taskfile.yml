@@ -39,6 +39,43 @@ tasks:
     cmds:
       - go test -v -race ./...
 
+  test:integration:
+    desc: Run integration tests (requires GraphDB instances)
+    cmds:
+      - echo "Running integration tests..."
+      - go test -v -tags=integration -timeout=10m ./cmd
+      - echo "Integration tests completed"
+
+  test:integration:setup:
+    desc: Setup GraphDB instances for integration testing
+    cmds:
+      - echo "Setting up GraphDB {{.GRAPHDB_VERS}} instances for integration testing..."
+      - docker pull ontotext/graphdb:{{.GRAPHDB_VERS}}
+      - docker rm -f graphdb-source-test || true
+      - docker rm -f graphdb-target-test || true
+      - docker run -d --name graphdb-source-test -p 7201:7200 -e GDB_HEAP_SIZE=2g ontotext/graphdb:{{.GRAPHDB_VERS}}
+      - docker run -d --name graphdb-target-test -p 7202:7200 -e GDB_HEAP_SIZE=2g ontotext/graphdb:{{.GRAPHDB_VERS}}
+      - echo "Waiting for GraphDB instances to start (60 seconds)..."
+      - sleep 60
+      - echo "GraphDB {{.GRAPHDB_VERS}} instances ready:"
+      - echo "  - Source at http://localhost:7201"
+      - echo "  - Target at http://localhost:7202"
+
+  test:integration:teardown:
+    desc: Stop and remove integration test GraphDB instances
+    cmds:
+      - echo "Stopping integration test GraphDB instances..."
+      - docker rm -f graphdb-source-test || true
+      - docker rm -f graphdb-target-test || true
+      - echo "Integration test instances stopped and removed"
+
+  test:integration:full:
+    desc: Run full integration test suite (setup, test, teardown)
+    cmds:
+      - task: test:integration:setup
+      - task: test:integration
+      - task: test:integration:teardown
+
   # Code quality tasks
   fmt:
     desc: Format Go code
