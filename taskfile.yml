@@ -88,6 +88,13 @@ tasks:
       - templ generate
       - echo "Templ templates generated successfully"
 
+  swagger:generate:
+    desc: Generate Swagger/OpenAPI documentation
+    cmds:
+      - ~/go/bin/swag init -g cmd/graphdb.go --output docs
+      - echo "Swagger documentation generated successfully"
+      - echo "Access at http://localhost:8080/swagger/index.html"
+
   vet:
     desc: Run Go vet
     cmds:

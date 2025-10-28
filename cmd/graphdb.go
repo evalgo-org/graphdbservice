@@ -1,3 +1,60 @@
+// Package cmd provides the main application commands and HTTP handlers
+// for the Pantopix GraphDB Service.
+//
+// @title Pantopix GraphDB Service API
+// @version 1.0
+// @description GraphDB repository and graph migration service with comprehensive monitoring, logging, and user management capabilities.
+// @description
+// @description This service provides:
+// @description - GraphDB repository migration (full backup and restore)
+// @description - GraphDB named graph migration (individual graph transfer)
+// @description - Repository management (create, delete, rename)
+// @description - Graph management (import, export, delete, rename)
+// @description - User authentication and authorization (RBAC)
+// @description - Migration session logging and monitoring
+// @description - Audit logging for all operations
+// @description - Real-time task execution with SSE streaming
+//
+// @contact.name Pantopix Support
+// @contact.url https://pantopix.com
+// @contact.email support@pantopix.com
+//
+// @license.name Proprietary
+// @license.url https://pantopix.com/license
+//
+// @host localhost:8080
+// @BasePath /
+//
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name X-API-Key
+// @description API Key for external integrations
+//
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description JWT token for authenticated users (format: "Bearer {token}")
+//
+// @tag.name Health
+// @tag.description Health check and service status endpoints
+//
+// @tag.name Authentication
+// @tag.description User authentication and session management
+//
+// @tag.name Migration
+// @tag.description GraphDB migration operations (repository and graph transfers)
+//
+// @tag.name Users
+// @tag.description User management endpoints (admin only)
+//
+// @tag.name Audit
+// @tag.description Audit log endpoints (admin only)
+//
+// @tag.name Logs
+// @tag.description Migration logging and monitoring endpoints (admin only)
+//
+// @tag.name Profile
+// @tag.description User profile management
 package cmd
 
 import (
@@ -21,6 +78,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	echoSwagger "github.com/swaggo/echo-swagger"
+
+	_ "evalgo.org/graphservice/docs" // Import generated docs
 )
 
 var (
@@ -1903,6 +1963,9 @@ var graphdbCmd = &cobra.Command{
 
 		// Static files (no authentication required for JS/CSS)
 		e.Static("/static", "web/static")
+
+		// Swagger documentation (public access)
+		e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 		// Protected UI routes (require authentication if enabled)
 		ui := e.Group("", AuthMiddleware(authMode))
