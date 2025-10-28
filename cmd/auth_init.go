@@ -14,6 +14,9 @@ import (
 var (
 	// userStore is the global user storage instance
 	userStore *auth.UserStore
+
+	// auditLogger is the global audit logging instance
+	auditLogger *auth.AuditLogger
 )
 
 // InitializeAuth initializes the authentication system
@@ -36,6 +39,12 @@ func InitializeAuth() error {
 	userStore, err = auth.NewUserStore(dataDir)
 	if err != nil {
 		return fmt.Errorf("failed to initialize user store: %w", err)
+	}
+
+	// Initialize audit logger
+	auditLogger, err = auth.NewAuditLogger(dataDir)
+	if err != nil {
+		return fmt.Errorf("failed to initialize audit logger: %w", err)
 	}
 
 	// Check if any users exist

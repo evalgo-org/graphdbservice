@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"evalgo.org/graphservice/auth"
 	"evalgo.org/graphservice/web/templates"
@@ -160,8 +161,32 @@ func getAuthMode() auth.AuthMode {
 }
 
 func logAudit(c echo.Context, userID, username, action, resource string, success bool, errorMsg string, details map[string]interface{}) {
-	// TODO: Implement audit logging (Phase 3)
-	// For now, just log to console
-	fmt.Printf("[AUDIT] User=%s Action=%s Resource=%s Success=%v IP=%s\n",
-		username, action, resource, success, c.RealIP())
+	// If audit logger is not initialized (AUTH_MODE=none), just log to console
+	if auditLogger == nil {
+		fmt.Printf("[AUDIT] User=%s Action=%s Resource=%s Success=%v IP=%s\n",
+			username, action, resource, success, c.RealIP())
+		return
+	}
+
+	// Create audit entry
+	entry := auth.AuditEntry{
+		Timestamp: time.Now(),
+		UserID:    userID,
+		Username:  username,
+		Action:    action,
+		Resource:  resource,
+		Success:   success,
+		IPAddress: c.RealIP(),
+		UserAgent: c.Request().UserAgent(),
+		ErrorMsg:  errorMsg,
+		Details:   details,
+	}
+
+	// Log entry (non-blocking - failures shouldn't break the application)
+	if err := auditLogger.LogEntry(entry); err != nil {
+		fmt.Printf("[ERROR] Failed to write audit log: %v\n", err)
+		// Still log to console as fallback
+		fmt.Printf("[AUDIT] User=%s Action=%s Resource=%s Success=%v IP=%s\n",
+			username, action, resource, success, c.RealIP())
+	}
 }

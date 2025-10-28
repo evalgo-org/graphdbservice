@@ -352,6 +352,7 @@ templ Layout(title string, user *auth.User) {
 							</div>
 							if user.Role == auth.RoleAdmin {
 								<a href="/admin/users" class="nav-link">Manage Users</a>
+								<a href="/admin/audit" class="nav-link">Audit Logs</a>
 							}
 							<a href="/profile/change-password" class="nav-link">Change Password</a>
 							<a href="/logout" class="nav-link">Logout</a>

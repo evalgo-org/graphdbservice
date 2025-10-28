@@ -77,7 +77,7 @@ func Layout(title string, user *auth.User) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if user.Role == auth.RoleAdmin {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<a href=\"/admin/users\" class=\"nav-link\">Manage Users</a> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<a href=\"/admin/users\" class=\"nav-link\">Manage Users</a> <a href=\"/admin/audit\" class=\"nav-link\">Audit Logs</a> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

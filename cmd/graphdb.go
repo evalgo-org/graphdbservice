@@ -1722,6 +1722,12 @@ var graphdbCmd = &cobra.Command{
 		admin.PUT("/users/:username", updateUserHandler) // Update user API
 		admin.DELETE("/users/:username", deleteUserHandler) // Delete user API
 
+		// Admin-only audit log endpoints
+		admin.GET("/audit", auditLogsPageHandler)      // HTML page
+		admin.GET("/audit/list", listAuditLogsHandler) // HTMX endpoint
+		admin.GET("/audit/api", getAuditLogsAPIHandler) // JSON API
+		admin.POST("/audit/rotate", rotateAuditLogsHandler) // Trigger rotation
+
 		port := os.Getenv("PORT")
 		if port == "" {
 			port = "8080"

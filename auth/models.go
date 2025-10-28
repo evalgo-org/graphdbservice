@@ -55,20 +55,6 @@ type SessionStore struct {
 	UpdatedAt time.Time          `json:"updated_at"`
 }
 
-// AuditEntry represents an audit log entry
-type AuditEntry struct {
-	ID        string                 `json:"id"`
-	Timestamp time.Time              `json:"timestamp"`
-	UserID    string                 `json:"user_id"`
-	Username  string                 `json:"username"`
-	Action    string                 `json:"action"` // "login", "logout", "task_execute", etc.
-	Resource  string                 `json:"resource"`
-	Details   map[string]interface{} `json:"details,omitempty"`
-	IPAddress string                 `json:"ip_address"`
-	Success   bool                   `json:"success"`
-	Error     string                 `json:"error,omitempty"`
-}
-
 // AuthMode represents the authentication mode
 type AuthMode string
 

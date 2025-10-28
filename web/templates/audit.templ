@@ -1,0 +1,264 @@
+package templates
+
+import (
+	"fmt"
+	"time"
+	"evalgo.org/graphservice/auth"
+)
+
+templ AuditLogs(user *auth.User) {
+	@Layout("Audit Logs", user) {
+		<div class="card">
+			<h2>Audit Logs</h2>
+			<p style="margin-bottom: 1.5rem; color: var(--gray-700);">
+				View and search system audit logs. All user actions are logged with timestamps, IP addresses, and details.
+			</p>
+
+			<!-- Filters -->
+			<div style="background: var(--gray-100); padding: 1rem; border-radius: 0.375rem; margin-bottom: 1.5rem;">
+				<form id="audit-filter-form" onsubmit="loadAuditLogs(event)">
+					<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+						<div class="form-group" style="margin-bottom: 0;">
+							<label for="filter-start-date">Start Date</label>
+							<input type="date" id="filter-start-date" name="start_date" value={ getDefaultStartDate() }/>
+						</div>
+						<div class="form-group" style="margin-bottom: 0;">
+							<label for="filter-end-date">End Date</label>
+							<input type="date" id="filter-end-date" name="end_date" value={ getDefaultEndDate() }/>
+						</div>
+						<div class="form-group" style="margin-bottom: 0;">
+							<label for="filter-username">Username</label>
+							<input type="text" id="filter-username" name="username" placeholder="All users"/>
+						</div>
+						<div class="form-group" style="margin-bottom: 0;">
+							<label for="filter-action">Action</label>
+							<select id="filter-action" name="action" style="width: 100%; padding: 0.75rem; border: 1px solid var(--gray-300); border-radius: 0.375rem;">
+								<option value="">All actions</option>
+								<option value="login">Login</option>
+								<option value="logout">Logout</option>
+								<option value="create_user">Create User</option>
+								<option value="update_user">Update User</option>
+								<option value="delete_user">Delete User</option>
+								<option value="change_password">Change Password</option>
+							</select>
+						</div>
+					</div>
+					<div style="margin-top: 1rem; display: flex; gap: 1rem;">
+						<button type="submit">Apply Filters</button>
+						<button type="button" onclick="resetFilters()" style="background: var(--gray-300); color: var(--gray-800);">Reset</button>
+					</div>
+				</form>
+			</div>
+
+			<!-- Audit Log List -->
+			<div id="audit-list" hx-get="/admin/audit/list" hx-trigger="load" hx-swap="innerHTML">
+				<p>Loading audit logs...</p>
+			</div>
+		</div>
+
+		<style>
+			.form-group {
+				margin-bottom: 1.25rem;
+			}
+			.form-group label {
+				display: block;
+				font-weight: 500;
+				margin-bottom: 0.5rem;
+				color: var(--text-primary);
+				font-size: 0.875rem;
+			}
+			.form-group input[type="text"],
+			.form-group input[type="date"] {
+				width: 100%;
+				padding: 0.75rem;
+				border: 1px solid var(--gray-300);
+				border-radius: 0.375rem;
+				font-size: 0.875rem;
+			}
+			.form-group input:focus {
+				outline: none;
+				border-color: var(--primary);
+				box-shadow: 0 0 0 3px rgba(240, 90, 40, 0.1);
+			}
+			.audit-table {
+				width: 100%;
+				border-collapse: collapse;
+				margin-top: 1rem;
+				font-size: 0.875rem;
+			}
+			.audit-table th {
+				text-align: left;
+				padding: 0.75rem;
+				background: var(--gray-100);
+				border-bottom: 2px solid var(--gray-300);
+				font-weight: 600;
+				color: var(--text-primary);
+				white-space: nowrap;
+			}
+			.audit-table td {
+				padding: 0.75rem;
+				border-bottom: 1px solid var(--gray-200);
+				vertical-align: top;
+			}
+			.audit-table tr:hover {
+				background: var(--gray-100);
+			}
+			.audit-badge {
+				display: inline-block;
+				padding: 0.25rem 0.75rem;
+				border-radius: 9999px;
+				font-size: 0.75rem;
+				font-weight: 600;
+				text-transform: uppercase;
+			}
+			.audit-badge.success {
+				background: var(--success);
+				color: white;
+			}
+			.audit-badge.error {
+				background: var(--error);
+				color: white;
+			}
+			.audit-timestamp {
+				color: var(--gray-700);
+				font-size: 0.875rem;
+			}
+			.audit-details {
+				font-family: 'Courier New', monospace;
+				font-size: 0.75rem;
+				color: var(--gray-700);
+				max-width: 300px;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+		</style>
+
+		<script>
+			function loadAuditLogs(event) {
+				if (event) event.preventDefault();
+
+				const form = document.getElementById('audit-filter-form');
+				const formData = new FormData(form);
+				const params = new URLSearchParams(formData);
+
+				htmx.ajax('GET', '/admin/audit/list?' + params.toString(), {
+					target: '#audit-list',
+					swap: 'innerHTML'
+				});
+			}
+
+			function resetFilters() {
+				document.getElementById('audit-filter-form').reset();
+				document.getElementById('filter-start-date').value = getDefaultStartDate();
+				document.getElementById('filter-end-date').value = getDefaultEndDate();
+				loadAuditLogs();
+			}
+
+			function getDefaultStartDate() {
+				const date = new Date();
+				date.setDate(date.getDate() - 7);
+				return date.toISOString().split('T')[0];
+			}
+
+			function getDefaultEndDate() {
+				return new Date().toISOString().split('T')[0];
+			}
+		</script>
+	}
+}
+
+func getDefaultStartDate() string {
+	return time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+}
+
+func getDefaultEndDate() string {
+	return time.Now().Format("2006-01-02")
+}
+
+templ AuditLogList(entries []auth.AuditEntry) {
+	if len(entries) == 0 {
+		<p>No audit logs found for the selected criteria.</p>
+	} else {
+		<table class="audit-table">
+			<thead>
+				<tr>
+					<th>Timestamp</th>
+					<th>Username</th>
+					<th>Action</th>
+					<th>Resource</th>
+					<th>Status</th>
+					<th>IP Address</th>
+					<th>Details</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, entry := range entries {
+					<tr>
+						<td class="audit-timestamp">
+							{ entry.Timestamp.Format("2006-01-02 15:04:05") }
+						</td>
+						<td>{ entry.Username }</td>
+						<td>{ formatAction(entry.Action) }</td>
+						<td>{ entry.Resource }</td>
+						<td>
+							if entry.Success {
+								<span class="audit-badge success">Success</span>
+							} else {
+								<span class="audit-badge error">Failed</span>
+							}
+						</td>
+						<td>{ entry.IPAddress }</td>
+						<td class="audit-details">
+							if entry.ErrorMsg != "" {
+								Error: { entry.ErrorMsg }
+							} else if len(entry.Details) > 0 {
+								{ formatDetails(entry.Details) }
+							} else {
+								-
+							}
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+		<div style="margin-top: 1rem; color: var(--gray-700); font-size: 0.875rem;">
+			Showing { fmt.Sprint(len(entries)) } entries
+		</div>
+	}
+}
+
+func formatAction(action string) string {
+	switch action {
+	case "login":
+		return "Login"
+	case "logout":
+		return "Logout"
+	case "create_user":
+		return "Create User"
+	case "update_user":
+		return "Update User"
+	case "delete_user":
+		return "Delete User"
+	case "change_password":
+		return "Change Password"
+	default:
+		return action
+	}
+}
+
+func formatDetails(details map[string]interface{}) string {
+	if len(details) == 0 {
+		return "-"
+	}
+	result := ""
+	for key, value := range details {
+		if result != "" {
+			result += ", "
+		}
+		result += fmt.Sprintf("%s: %v", key, value)
+	}
+	if len(result) > 100 {
+		return result[:97] + "..."
+	}
+	return result
+}
