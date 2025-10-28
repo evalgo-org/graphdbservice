@@ -123,7 +123,8 @@ func uiExecuteHandler(c echo.Context) error {
 	// Parse the JSON from form
 	taskJSON := c.FormValue("task_json")
 	if taskJSON == "" {
-		return c.HTML(http.StatusBadRequest, `
+		// Return 200 for HTMX to swap the content (validation errors are expected)
+		return c.HTML(http.StatusOK, `
 			<div class="alert alert-error">
 				<strong>Error:</strong> Task JSON is required
 			</div>
@@ -135,7 +136,8 @@ func uiExecuteHandler(c echo.Context) error {
 	if err := json.Unmarshal([]byte(taskJSON), &req); err != nil {
 		// Generate user-friendly error message
 		friendlyMsg := formatJSONError(err, taskJSON)
-		return c.HTML(http.StatusBadRequest, fmt.Sprintf(`
+		// Return 200 for HTMX to swap the content (validation errors are expected)
+		return c.HTML(http.StatusOK, fmt.Sprintf(`
 			<div class="alert alert-error">
 				<strong>Invalid JSON:</strong> %s
 			</div>
@@ -144,17 +146,19 @@ func uiExecuteHandler(c echo.Context) error {
 
 	// Validate request
 	if req.Version == "" {
-		return c.HTML(http.StatusBadRequest, `
+		// Return 200 for HTMX to swap the content (validation errors are expected)
+		return c.HTML(http.StatusOK, `
 			<div class="alert alert-error">
-				Version is required
+				<strong>Error:</strong> Version is required
 			</div>
 		`)
 	}
 
 	if len(req.Tasks) == 0 {
-		return c.HTML(http.StatusBadRequest, `
+		// Return 200 for HTMX to swap the content (validation errors are expected)
+		return c.HTML(http.StatusOK, `
 			<div class="alert alert-error">
-				At least one task is required
+				<strong>Error:</strong> At least one task is required
 			</div>
 		`)
 	}

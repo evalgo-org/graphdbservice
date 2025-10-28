@@ -89,7 +89,7 @@ func TestUIExecuteHandlerJSONErrors(t *testing.T) {
 		{
 			name:           "Empty JSON input",
 			jsonInput:      "",
-			expectedStatus: http.StatusBadRequest,
+			expectedStatus: http.StatusOK, // Returns 200 for HTMX to display error
 			expectedContains: []string{
 				"Task JSON is required",
 			},
@@ -97,7 +97,7 @@ func TestUIExecuteHandlerJSONErrors(t *testing.T) {
 		{
 			name:           "Invalid JSON - missing brace",
 			jsonInput:      `{"version": "v0.0.1"`,
-			expectedStatus: http.StatusBadRequest,
+			expectedStatus: http.StatusOK, // Returns 200 for HTMX to display error
 			expectedContains: []string{
 				"Invalid JSON",
 				"Hint:",
@@ -106,7 +106,7 @@ func TestUIExecuteHandlerJSONErrors(t *testing.T) {
 		{
 			name:           "Invalid JSON - trailing comma",
 			jsonInput:      `{"version": "v0.0.1", "tasks": [],}`,
-			expectedStatus: http.StatusBadRequest,
+			expectedStatus: http.StatusOK, // Returns 200 for HTMX to display error
 			expectedContains: []string{
 				"Invalid JSON",
 				"Hint:",
@@ -115,7 +115,7 @@ func TestUIExecuteHandlerJSONErrors(t *testing.T) {
 		{
 			name:           "Valid JSON but missing version",
 			jsonInput:      `{"tasks": []}`,
-			expectedStatus: http.StatusBadRequest,
+			expectedStatus: http.StatusOK, // Returns 200 for HTMX to display error
 			expectedContains: []string{
 				"Version is required",
 			},
@@ -123,7 +123,7 @@ func TestUIExecuteHandlerJSONErrors(t *testing.T) {
 		{
 			name:           "Valid JSON but missing tasks",
 			jsonInput:      `{"version": "v0.0.1"}`,
-			expectedStatus: http.StatusBadRequest,
+			expectedStatus: http.StatusOK, // Returns 200 for HTMX to display error
 			expectedContains: []string{
 				"At least one task is required",
 			},
