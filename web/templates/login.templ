@@ -6,15 +6,21 @@ templ Login(errorMessage string) {
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-			<title>Login - GraphDB Service</title>
+			<title>Login - Pantopix GraphDB Service</title>
+			<link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet"/>
 			<style>
 				:root {
-					--primary: #007bff;
-					--primary-dark: #0056b3;
-					--danger: #dc3545;
-					--gray-100: #f8f9fa;
-					--gray-700: #495057;
-					--gray-800: #343a40;
+					--primary: #f05a28;
+					--primary-dark: #d94d21;
+					--error: #ef4444;
+					--text-primary: #334f74;
+					--text-secondary: #849d96;
+					--text-dark: #000429;
+					--gray-100: #eeeeee;
+					--gray-200: #e5e7eb;
+					--gray-300: #d1d5db;
+					--gray-700: #3a3a3a;
+					--gray-800: #334f74;
 				}
 
 				* {
@@ -24,8 +30,9 @@ templ Login(errorMessage string) {
 				}
 
 				body {
-					font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-					background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+					font-family: "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+					font-weight: 300;
+					background: var(--gray-100);
 					min-height: 100vh;
 					display: flex;
 					align-items: center;
@@ -35,49 +42,54 @@ templ Login(errorMessage string) {
 
 				.login-container {
 					background: white;
-					border-radius: 12px;
-					box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-					max-width: 420px;
+					border-radius: 0.5rem;
+					box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+					max-width: 450px;
 					width: 100%;
-					padding: 2.5rem;
+					padding: 3rem 2.5rem;
 				}
 
 				.login-header {
 					text-align: center;
-					margin-bottom: 2rem;
+					margin-bottom: 2.5rem;
 				}
 
 				.login-header h1 {
-					color: var(--gray-800);
-					font-size: 1.75rem;
+					font-family: "Noto Serif JP", serif;
+					color: var(--text-primary);
+					font-size: 2rem;
+					font-weight: 600;
 					margin-bottom: 0.5rem;
 				}
 
 				.login-header p {
-					color: var(--gray-700);
+					color: var(--text-secondary);
 					font-size: 0.875rem;
+					font-weight: 300;
 				}
 
 				.logo {
-					width: 60px;
-					height: 60px;
-					margin: 0 auto 1rem;
-					background: var(--primary);
-					border-radius: 12px;
+					width: 80px;
+					height: 80px;
+					margin: 0 auto 1.5rem;
+					background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+					border-radius: 0.5rem;
 					display: flex;
 					align-items: center;
 					justify-content: center;
 					color: white;
-					font-size: 1.5rem;
-					font-weight: bold;
+					font-family: "Noto Serif JP", serif;
+					font-size: 2rem;
+					font-weight: 700;
+					box-shadow: 0 4px 6px rgba(240, 90, 40, 0.2);
 				}
 
 				.error-message {
-					background: #fee;
-					border: 1px solid var(--danger);
-					color: var(--danger);
-					padding: 0.75rem 1rem;
-					border-radius: 6px;
+					background: #fee2e2;
+					border: 1px solid #fecaca;
+					color: #991b1b;
+					padding: 1rem;
+					border-radius: 0.375rem;
 					margin-bottom: 1.5rem;
 					font-size: 0.875rem;
 					display: flex;
@@ -88,6 +100,7 @@ templ Login(errorMessage string) {
 				.error-message::before {
 					content: "⚠";
 					font-size: 1.25rem;
+					color: var(--error);
 				}
 
 				.form-group {
@@ -96,7 +109,7 @@ templ Login(errorMessage string) {
 
 				.form-group label {
 					display: block;
-					color: var(--gray-800);
+					color: var(--text-primary);
 					font-weight: 500;
 					margin-bottom: 0.5rem;
 					font-size: 0.875rem;
@@ -104,9 +117,10 @@ templ Login(errorMessage string) {
 
 				.form-group input {
 					width: 100%;
-					padding: 0.75rem 1rem;
-					border: 1px solid #ddd;
-					border-radius: 6px;
+					padding: 0.75rem;
+					border: 1px solid var(--gray-300);
+					border-radius: 0.375rem;
+					font-family: "Lato", sans-serif;
 					font-size: 1rem;
 					transition: border-color 0.2s, box-shadow 0.2s;
 				}
@@ -114,20 +128,23 @@ templ Login(errorMessage string) {
 				.form-group input:focus {
 					outline: none;
 					border-color: var(--primary);
-					box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+					box-shadow: 0 0 0 3px rgba(240, 90, 40, 0.1);
 				}
 
 				.login-button {
 					width: 100%;
-					padding: 0.875rem 1rem;
+					padding: 0.75rem 1.5rem;
 					background: var(--primary);
 					color: white;
 					border: none;
-					border-radius: 6px;
+					border-radius: 0.375rem;
+					font-family: "Lato", sans-serif;
 					font-size: 1rem;
-					font-weight: 600;
+					font-weight: 400;
+					text-transform: uppercase;
+					letter-spacing: 0.5px;
 					cursor: pointer;
-					transition: background 0.2s, transform 0.1s;
+					transition: background 0.2s;
 					margin-top: 0.5rem;
 				}
 
@@ -135,25 +152,27 @@ templ Login(errorMessage string) {
 					background: var(--primary-dark);
 				}
 
-				.login-button:active {
-					transform: translateY(1px);
+				.login-button:disabled {
+					background: var(--gray-300);
+					cursor: not-allowed;
 				}
 
 				.login-footer {
-					margin-top: 2rem;
+					margin-top: 2.5rem;
 					padding-top: 1.5rem;
-					border-top: 1px solid #eee;
+					border-top: 1px solid var(--gray-200);
 					text-align: center;
 					font-size: 0.75rem;
-					color: var(--gray-700);
+					color: var(--text-secondary);
+					font-weight: 300;
 				}
 			</style>
 		</head>
 		<body>
 			<div class="login-container">
 				<div class="login-header">
-					<div class="logo">G</div>
-					<h1>GraphDB Service</h1>
+					<div class="logo">P</div>
+					<h1>Pantopix GraphDB Service</h1>
 					<p>Please login to continue</p>
 				</div>
 				if errorMessage != "" {
@@ -190,7 +209,7 @@ templ Login(errorMessage string) {
 					</button>
 				</form>
 				<div class="login-footer">
-					GraphDB Service v1.0 - Secure Access
+					Pantopix GraphDB Service - Secure Access
 				</div>
 			</div>
 		</body>
