@@ -54,22 +54,37 @@ templ Layout(title string, user *auth.User) {
 				header {
 					background: white;
 					border-bottom: 1px solid var(--gray-200);
-					padding: 1.5rem 0;
+					padding: 1rem 0;
 					margin-bottom: 2rem;
 					box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 				}
 
+				.header-content {
+					max-width: 1200px;
+					margin: 0 auto;
+					padding: 0 2rem;
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+				}
+
+				.header-title {
+					flex: 0 0 auto;
+				}
+
 				header h1 {
 					font-family: "Noto Serif JP", serif;
-					font-size: 1.875rem;
+					font-size: 1.5rem;
 					font-weight: 600;
 					color: var(--text-primary);
+					margin: 0;
 				}
 
 				header p {
 					color: var(--text-secondary);
-					margin-top: 0.25rem;
+					margin: 0;
 					font-weight: 300;
+					font-size: 0.875rem;
 				}
 
 				.card {
@@ -296,12 +311,9 @@ templ Layout(title string, user *auth.User) {
 
 				.user-navbar {
 					display: flex;
-					justify-content: flex-end;
 					align-items: center;
 					gap: 1.5rem;
-					margin-top: 1rem;
-					padding-top: 1rem;
-					border-top: 1px solid var(--gray-200);
+					flex: 0 0 auto;
 				}
 
 				.user-info {
@@ -310,6 +322,8 @@ templ Layout(title string, user *auth.User) {
 					gap: 0.5rem;
 					color: var(--text-primary);
 					font-size: 0.875rem;
+					padding-right: 1.5rem;
+					border-right: 1px solid var(--gray-200);
 				}
 
 				.user-badge {
@@ -339,9 +353,11 @@ templ Layout(title string, user *auth.User) {
 		</head>
 		<body>
 			<header>
-				<div class="container">
-					<h1>Pantopix GraphDB Service</h1>
-					<p>Execute and monitor GraphDB repository and graph operations</p>
+				<div class="header-content">
+					<div class="header-title">
+						<h1>Pantopix GraphDB Service</h1>
+						<p>Execute and monitor GraphDB repository and graph operations</p>
+					</div>
 					if user != nil {
 						<div class="user-navbar">
 							<div class="user-info">
