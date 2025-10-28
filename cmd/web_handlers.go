@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"evalgo.org/graphservice/auth"
 	"evalgo.org/graphservice/web/templates"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -114,7 +115,15 @@ func getErrorLocation(jsonStr string, offset int64) (line int, col int, snippet 
 
 // uiIndexHandler serves the main UI page
 func uiIndexHandler(c echo.Context) error {
-	component := templates.Index()
+	// Get user from context (set by auth middleware)
+	var user *auth.User
+	if val := c.Get("user"); val != nil {
+		if u, ok := val.(*auth.User); ok {
+			user = u
+		}
+	}
+
+	component := templates.Index(user)
 	return component.Render(c.Request().Context(), c.Response().Writer)
 }
 

@@ -1,6 +1,8 @@
 package templates
 
-templ Layout(title string) {
+import "evalgo.org/graphservice/auth"
+
+templ Layout(title string, user *auth.User) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
@@ -291,6 +293,48 @@ templ Layout(title string) {
 					color: var(--text-primary);
 					font-weight: 600;
 				}
+
+				.user-navbar {
+					display: flex;
+					justify-content: flex-end;
+					align-items: center;
+					gap: 1.5rem;
+					margin-top: 1rem;
+					padding-top: 1rem;
+					border-top: 1px solid var(--gray-200);
+				}
+
+				.user-info {
+					display: flex;
+					align-items: center;
+					gap: 0.5rem;
+					color: var(--text-primary);
+					font-size: 0.875rem;
+				}
+
+				.user-badge {
+					display: inline-block;
+					padding: 0.25rem 0.75rem;
+					border-radius: 9999px;
+					font-size: 0.75rem;
+					font-weight: 600;
+					text-transform: uppercase;
+					background: var(--primary);
+					color: white;
+				}
+
+				.nav-link {
+					color: var(--primary);
+					text-decoration: none;
+					font-size: 0.875rem;
+					font-weight: 400;
+					transition: color 0.2s;
+				}
+
+				.nav-link:hover {
+					color: var(--primary-dark);
+					text-decoration: underline;
+				}
 			</style>
 		</head>
 		<body>
@@ -298,6 +342,21 @@ templ Layout(title string) {
 				<div class="container">
 					<h1>Pantopix GraphDB Service</h1>
 					<p>Execute and monitor GraphDB repository and graph operations</p>
+					if user != nil {
+						<div class="user-navbar">
+							<div class="user-info">
+								<span>{ user.Username }</span>
+								if user.Role == auth.RoleAdmin {
+									<span class="user-badge">Admin</span>
+								}
+							</div>
+							if user.Role == auth.RoleAdmin {
+								<a href="/admin/users" class="nav-link">Manage Users</a>
+							}
+							<a href="/profile/change-password" class="nav-link">Change Password</a>
+							<a href="/logout" class="nav-link">Logout</a>
+						</div>
+					}
 				</div>
 			</header>
 			<main class="container">

@@ -30,7 +30,15 @@ func AuthMiddleware(mode auth.AuthMode) echo.MiddlewareFunc {
 				return c.Redirect(http.StatusFound, "/login?error=Session expired. Please login again")
 			}
 
+			// Get full user object from store
+			user, err := userStore.GetUser(claims.Username)
+			if err != nil {
+				// User not found (maybe deleted), redirect to login
+				return c.Redirect(http.StatusFound, "/login?error=User not found. Please login again")
+			}
+
 			// Store user info in context for handlers to use
+			c.Set("user", user)
 			c.Set("user_id", claims.UserID)
 			c.Set("username", claims.Username)
 			c.Set("role", claims.Role)

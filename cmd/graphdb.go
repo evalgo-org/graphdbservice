@@ -1707,6 +1707,21 @@ var graphdbCmd = &cobra.Command{
 		ui.GET("/ui/stream/:sessionID", uiStreamHandler)
 		ui.GET("/logout", logoutHandler)
 
+		// User profile endpoints (authenticated users)
+		ui.GET("/profile/change-password", changePasswordPageHandler)
+		ui.GET("/api/users/me", getCurrentUserHandler)
+		ui.POST("/api/users/me/password", changePasswordHandler)
+
+		// Admin-only user management endpoints
+		admin := ui.Group("/admin", AdminOnlyMiddleware())
+		admin.GET("/users", usersPageHandler)           // HTML page
+		admin.GET("/users/list", listUsersHandler)      // HTMX endpoint
+		admin.GET("/users/api", listUsersAPIHandler)    // JSON API
+		admin.POST("/users", createUserHandler)         // Create user API
+		admin.GET("/users/:username", getUserHandler)   // Get single user API
+		admin.PUT("/users/:username", updateUserHandler) // Update user API
+		admin.DELETE("/users/:username", deleteUserHandler) // Delete user API
+
 		port := os.Getenv("PORT")
 		if port == "" {
 			port = "8080"

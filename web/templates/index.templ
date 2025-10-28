@@ -1,7 +1,9 @@
 package templates
 
-templ Index() {
-	@Layout("Task Execution") {
+import "evalgo.org/graphservice/auth"
+
+templ Index(user *auth.User) {
+	@Layout("Task Execution", user) {
 		<div class="card">
 			<h2>Submit Migration Tasks</h2>
 			<p style="margin-bottom: 1rem; color: var(--gray-700);">
