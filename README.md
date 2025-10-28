@@ -46,6 +46,7 @@ A comprehensive RESTful API service for managing GraphDB repositories and RDF gr
 - **Multiple RDF Formats**: Support for RDF/XML, Turtle, N-Triples, JSON-LD, and Binary RDF
 - **Error Handling**: Comprehensive error reporting with detailed messages
 - **Audit Logging**: Track all user actions and system events
+- **Migration Logging**: Complete traceability of all migration operations with detailed task tracking
 - **Logging**: Structured logging for debugging and monitoring
 
 ## Architecture
@@ -78,6 +79,8 @@ pxgraphservice/
 │   ├── password.go         # Password hashing and validation
 │   ├── jwt.go              # JWT token generation and validation
 │   ├── storage.go          # File-based user storage with locking
+│   ├── audit.go            # Audit logging for user actions
+│   ├── migration_logger.go # Migration operation logging and tracking
 │   ├── *_test.go           # Comprehensive unit tests (60+ tests)
 ├── web/                     # Web UI templates
 │   └── templates/          # Templ templates
@@ -85,9 +88,13 @@ pxgraphservice/
 │       ├── index.templ     # Main task execution page
 │       ├── login.templ     # Login page
 │       ├── users.templ     # User management page
-│       └── change_password.templ  # Password change page
+│       ├── change_password.templ  # Password change page
+│       ├── audit.templ     # Audit logs page
+│       └── migration_logs.templ # Migration logs page
 ├── data/                    # Runtime data (not in version control)
-│   └── users/              # User database and backups
+│   ├── users/              # User database and backups
+│   ├── audit/              # Audit log files
+│   └── migrations/         # Migration log files and sessions
 ├── go.mod                   # Go module dependencies
 ├── taskfile.yml             # Task automation
 └── README.md                # This file
@@ -257,6 +264,48 @@ All authenticated users can change their password at `/profile/change-password`:
 5. Confirm new password
 6. Click "Change Password"
 ```
+
+#### Migration Logs (Admin Only)
+
+Access the migration logs page at `/admin/migrations` (requires admin role):
+
+**Features:**
+- **Real-time Statistics Dashboard**: View active sessions, completion rates, and success metrics
+- **Session Tracking**: Complete history of all migration operations
+- **Task-Level Details**: Individual task status, duration, and data size
+- **Search and Filter**: Filter by date, username, or status
+- **Date Range Analytics**: View migration statistics across custom date ranges
+- **Error Tracking**: Detailed error messages and failure analysis
+- **Active Session Monitoring**: Real-time updates of running migrations
+- **Data Size Metrics**: Track total data transferred in migrations
+
+**Migration Log Information:**
+Each migration session includes:
+- Session ID and user information
+- Start/end timestamps and duration
+- Status (running, completed, failed)
+- Task breakdown (total, completed, failed, timeout)
+- Data size transferred
+- Source and target URLs
+- Individual task details with errors
+
+**Migration Log Storage:**
+- Logs stored in `${DATA_DIR}/migrations/`
+- Daily summary files: `migration_YYYY-MM-DD.json` (uncompressed)
+- Detailed session files: `sessions/[session-id].json`
+- **Automated Log Rotation Strategy:**
+  - Keep daily logs for **7 days** (uncompressed for fast access)
+  - Compress logs older than 7 days into **weekly archives** (tar.gz)
+  - Keep weekly archives for **4 weeks**
+  - Delete archives older than 4 weeks
+  - Weekly archives named: `migration_YYYY-WWW.tar.gz` (ISO week format)
+
+**Benefits:**
+- Complete audit trail of all data movements
+- Performance analysis and optimization insights
+- Debugging failed migrations with full context
+- Compliance reporting for data governance
+- Capacity planning based on historical data
 
 ### API Operations
 

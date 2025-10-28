@@ -322,7 +322,9 @@ templ Layout(title string, user *auth.User) {
 					gap: 0.5rem;
 					color: var(--text-primary);
 					font-size: 0.875rem;
+					padding-left: 1.5rem;
 					padding-right: 1.5rem;
+					border-left: 1px solid var(--gray-200);
 					border-right: 1px solid var(--gray-200);
 				}
 
@@ -360,17 +362,19 @@ templ Layout(title string, user *auth.User) {
 					</div>
 					if user != nil {
 						<div class="user-navbar">
+							<a href="/" class="nav-link">Tasks</a>
+							if user.Role == auth.RoleAdmin {
+								<a href="/admin/users" class="nav-link">Users</a>
+								<a href="/admin/audit" class="nav-link">Audit</a>
+								<a href="/admin/migrations" class="nav-link">Logs</a>
+							}
+							<a href="/profile/change-password" class="nav-link">Change Password</a>
 							<div class="user-info">
 								<span>{ user.Username }</span>
 								if user.Role == auth.RoleAdmin {
 									<span class="user-badge">Admin</span>
 								}
 							</div>
-							if user.Role == auth.RoleAdmin {
-								<a href="/admin/users" class="nav-link">Manage Users</a>
-								<a href="/admin/audit" class="nav-link">Audit Logs</a>
-							}
-							<a href="/profile/change-password" class="nav-link">Change Password</a>
 							<a href="/logout" class="nav-link">Logout</a>
 						</div>
 					}

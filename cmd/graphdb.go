@@ -14,6 +14,7 @@ import (
 	"time"
 
 	// eve "eve.evalgo.org/common"
+	"evalgo.org/graphservice/auth"
 	"eve.evalgo.org/db"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -406,14 +407,96 @@ func migrationHandlerJSON(c echo.Context) error {
 		}
 	}
 
+	// Start migration session logging (if auth is enabled)
+	var session *auth.MigrationSession
+	if migrationLogger != nil {
+		userID, username, _, authenticated := GetCurrentUser(c)
+		if !authenticated {
+			userID = "anonymous"
+			username = "anonymous"
+		}
+
+		ipAddress := c.RealIP()
+		userAgent := c.Request().UserAgent()
+
+		var err error
+		session, err = migrationLogger.StartSession(userID, username, ipAddress, userAgent, len(req.Tasks))
+		if err != nil {
+			fmt.Printf("Warning: Failed to start migration session logging: %v\n", err)
+		}
+	}
+
 	// Process tasks
 	results := make([]map[string]interface{}, len(req.Tasks))
+	hasError := false
 	for i, task := range req.Tasks {
+		// Log task start
+		if session != nil {
+			repoID := ""
+			graphID := ""
+			if task.Src != nil {
+				repoID = task.Src.Repo
+				if task.Src.Graph != "" {
+					graphID = task.Src.Graph
+				}
+			}
+			srcURL := ""
+			if task.Src != nil {
+				srcURL = task.Src.URL
+			}
+			tgtURL := ""
+			if task.Tgt != nil {
+				tgtURL = task.Tgt.URL
+			}
+
+			if err := migrationLogger.StartTask(session.ID, i, task.Action, srcURL, tgtURL, repoID, graphID); err != nil {
+				fmt.Printf("Warning: Failed to log task start: %v\n", err)
+			}
+		}
+
 		result, err := processTask(task, nil, i)
 		if err != nil {
+			hasError = true
+			// Log task failure
+			if session != nil {
+				if logErr := migrationLogger.FailTask(session.ID, i, "execution_error", err.Error(), 0); logErr != nil {
+					fmt.Printf("Warning: Failed to log task failure: %v\n", logErr)
+				}
+			}
+			// Mark session as failed and return error
+			if session != nil {
+				if failErr := migrationLogger.FailSession(session.ID, fmt.Sprintf("Task %d failed: %s", i, err.Error())); failErr != nil {
+					fmt.Printf("Warning: Failed to log session failure: %v\n", failErr)
+				}
+			}
 			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Task %d failed: %s", i, err.Error()))
 		}
+
+		// Log task success
+		if session != nil {
+			dataSize := int64(0)
+			tripleCount := int64(0)
+			// Extract metrics from result if available
+			if size, ok := result["data_size"].(int64); ok {
+				dataSize = size
+			}
+			if count, ok := result["triple_count"].(int64); ok {
+				tripleCount = count
+			}
+
+			if err := migrationLogger.CompleteTask(session.ID, i, dataSize, tripleCount); err != nil {
+				fmt.Printf("Warning: Failed to log task completion: %v\n", err)
+			}
+		}
+
 		results[i] = result
+	}
+
+	// Complete session
+	if session != nil && !hasError {
+		if err := migrationLogger.CompleteSession(session.ID); err != nil {
+			fmt.Printf("Warning: Failed to complete migration session: %v\n", err)
+		}
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
@@ -526,21 +609,87 @@ func migrationHandlerMultipart(c echo.Context) error {
 		}
 	}
 
+	// Start migration session logging (if auth is enabled)
+	var session *auth.MigrationSession
+	if migrationLogger != nil {
+		userID, username, _, authenticated := GetCurrentUser(c)
+		if !authenticated {
+			userID = "anonymous"
+			username = "anonymous"
+		}
+
+		ipAddress := c.RealIP()
+		userAgent := c.Request().UserAgent()
+
+		var err error
+		session, err = migrationLogger.StartSession(userID, username, ipAddress, userAgent, len(req.Tasks))
+		if err != nil {
+			fmt.Printf("Warning: Failed to start migration session logging: %v\n", err)
+		}
+	}
+
 	// Process tasks with files
 	results := make([]map[string]interface{}, len(req.Tasks))
+	hasError := false
 	for i, task := range req.Tasks {
 		fmt.Printf("DEBUG: Processing task %d: %s\n", i, task.Action)
+
+		// Log task start
+		if session != nil {
+			repoID := ""
+			graphID := ""
+			if task.Src != nil {
+				repoID = task.Src.Repo
+				if task.Src.Graph != "" {
+					graphID = task.Src.Graph
+				}
+			}
+			srcURL := ""
+			if task.Src != nil {
+				srcURL = task.Src.URL
+			}
+			tgtURL := ""
+			if task.Tgt != nil {
+				tgtURL = task.Tgt.URL
+			}
+
+			if err := migrationLogger.StartTask(session.ID, i, task.Action, srcURL, tgtURL, repoID, graphID); err != nil {
+				fmt.Printf("Warning: Failed to log task start: %v\n", err)
+			}
+
+			// Log file info if available
+			fileKey := fmt.Sprintf("task_%d_files", i)
+			if taskFiles, exists := files[fileKey]; exists && len(taskFiles) > 0 {
+				fileHeader := taskFiles[0]
+				if err := migrationLogger.SetTaskFileInfo(session.ID, i, fileHeader.Filename, fileHeader.Header.Get("Content-Type"), fileHeader.Size, ""); err != nil {
+					fmt.Printf("Warning: Failed to log file info: %v\n", err)
+				}
+			}
+		}
 
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
 					fmt.Printf("PANIC RECOVERED in task %d processing: %v\n", i, r)
+					hasError = true
+					if session != nil {
+						if err := migrationLogger.FailTask(session.ID, i, "panic", fmt.Sprintf("%v", r), 0); err != nil {
+							fmt.Printf("Warning: Failed to log task panic: %v\n", err)
+						}
+					}
 				}
 			}()
 
 			result, err := processTask(task, files, i)
 			if err != nil {
 				fmt.Printf("ERROR: Task %d failed: %v\n", i, err)
+				hasError = true
+				// Log task failure
+				if session != nil {
+					if logErr := migrationLogger.FailTask(session.ID, i, "execution_error", err.Error(), 0); logErr != nil {
+						fmt.Printf("Warning: Failed to log task failure: %v\n", logErr)
+					}
+				}
 				// Don't return error here, capture it in results
 				results[i] = map[string]interface{}{
 					"action": task.Action,
@@ -549,9 +698,40 @@ func migrationHandlerMultipart(c echo.Context) error {
 				}
 				return
 			}
+
+			// Log task success
+			if session != nil {
+				dataSize := int64(0)
+				tripleCount := int64(0)
+				// Extract metrics from result if available
+				if size, ok := result["data_size"].(int64); ok {
+					dataSize = size
+				}
+				if count, ok := result["triple_count"].(int64); ok {
+					tripleCount = count
+				}
+
+				if err := migrationLogger.CompleteTask(session.ID, i, dataSize, tripleCount); err != nil {
+					fmt.Printf("Warning: Failed to log task completion: %v\n", err)
+				}
+			}
+
 			results[i] = result
 			fmt.Printf("DEBUG: Task %d completed successfully\n", i)
 		}()
+	}
+
+	// Complete or fail session based on results
+	if session != nil {
+		if hasError {
+			if err := migrationLogger.FailSession(session.ID, "One or more tasks failed"); err != nil {
+				fmt.Printf("Warning: Failed to log session failure: %v\n", err)
+			}
+		} else {
+			if err := migrationLogger.CompleteSession(session.ID); err != nil {
+				fmt.Printf("Warning: Failed to complete migration session: %v\n", err)
+			}
+		}
 	}
 
 	fmt.Println("DEBUG: All tasks processed, returning response")
@@ -1727,6 +1907,15 @@ var graphdbCmd = &cobra.Command{
 		admin.GET("/audit/list", listAuditLogsHandler) // HTMX endpoint
 		admin.GET("/audit/api", getAuditLogsAPIHandler) // JSON API
 		admin.POST("/audit/rotate", rotateAuditLogsHandler) // Trigger rotation
+
+		// Admin-only migration log endpoints
+		admin.GET("/migrations", migrationLogsPageHandler)        // HTML page
+		admin.GET("/migrations/list", listMigrationLogsHandler)   // HTMX endpoint
+		admin.GET("/migrations/stats", getMigrationStatsHandler)  // Stats API
+		admin.GET("/migrations/active", getActiveSessionsHandler) // Active sessions API
+		admin.GET("/migrations/session/:id", getMigrationSessionHandler) // Get single session
+		admin.GET("/migrations/summary/:date", getDailySummaryHandler)   // Daily summary
+		admin.POST("/migrations/rotate", rotateOldMigrationLogsHandler)  // Trigger rotation
 
 		port := os.Getenv("PORT")
 		if port == "" {

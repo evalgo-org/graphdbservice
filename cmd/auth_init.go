@@ -17,6 +17,9 @@ var (
 
 	// auditLogger is the global audit logging instance
 	auditLogger *auth.AuditLogger
+
+	// migrationLogger is the global migration logging instance
+	migrationLogger *auth.MigrationLogger
 )
 
 // InitializeAuth initializes the authentication system
@@ -45,6 +48,16 @@ func InitializeAuth() error {
 	auditLogger, err = auth.NewAuditLogger(dataDir)
 	if err != nil {
 		return fmt.Errorf("failed to initialize audit logger: %w", err)
+	}
+
+	// Initialize migration logger
+	// The migration logger now uses a fixed rotation strategy:
+	// - Daily logs for 7 days
+	// - Weekly compressed archives for 4 weeks
+	// - Automatic deletion after 4 weeks
+	migrationLogger, err = auth.NewMigrationLogger(dataDir, 35) // 35 days total (7 + 28)
+	if err != nil {
+		return fmt.Errorf("failed to initialize migration logger: %w", err)
 	}
 
 	// Check if any users exist
