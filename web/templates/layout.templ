@@ -351,6 +351,50 @@ templ Layout(title string, user *auth.User) {
 					color: var(--primary-dark);
 					text-decoration: underline;
 				}
+
+				/* Modal styles */
+				.modal {
+					display: none;
+					position: fixed;
+					z-index: 1000;
+					left: 0;
+					top: 0;
+					width: 100%;
+					height: 100%;
+					overflow: auto;
+					background-color: rgba(0, 0, 0, 0.5);
+				}
+				.modal-content {
+					background-color: white;
+					margin: 5% auto;
+					padding: 0;
+					border-radius: 0.5rem;
+					width: 90%;
+					max-width: 800px;
+					box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+				}
+				.modal-header {
+					padding: 1.5rem;
+					border-bottom: 1px solid var(--gray-200);
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+				}
+				.modal-body {
+					padding: 1.5rem;
+					max-height: 70vh;
+					overflow-y: auto;
+				}
+				.modal-close {
+					color: var(--text-secondary);
+					font-size: 2rem;
+					font-weight: 300;
+					cursor: pointer;
+					line-height: 1;
+				}
+				.modal-close:hover {
+					color: var(--text-primary);
+				}
 			</style>
 		</head>
 		<body>

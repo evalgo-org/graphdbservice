@@ -17,24 +17,26 @@ function clearFilters() {
 }
 
 async function rotateOldLogs() {
-	if (!confirm('Are you sure you want to rotate old migration logs? This will archive logs older than the retention period.')) {
-		return;
-	}
+	showConfirmModal(
+		'Rotate Old Logs',
+		'Are you sure you want to rotate old migration logs? This will archive logs older than the retention period.',
+		async function() {
+			try {
+				const response = await fetch('/admin/migrations/rotate', {
+					method: 'POST'
+				});
 
-	try {
-		const response = await fetch('/admin/migrations/rotate', {
-			method: 'POST'
-		});
-
-		if (response.ok) {
-			alert('Old logs rotated successfully');
-		} else {
-			const error = await response.json();
-			alert('Failed to rotate logs: ' + (error.error || 'Unknown error'));
+				if (response.ok) {
+					showModal('Success', 'Old logs rotated successfully', 'success');
+				} else {
+					const error = await response.json();
+					showModal('Error', 'Failed to rotate logs: ' + (error.error || 'Unknown error'), 'error');
+				}
+			} catch (err) {
+				showModal('Error', 'Failed to rotate logs: ' + err.message, 'error');
+			}
 		}
-	} catch (err) {
-		alert('Failed to rotate logs: ' + err.message);
-	}
+	);
 }
 
 function viewSession(sessionId) {
@@ -44,7 +46,7 @@ function viewSession(sessionId) {
 			showSessionDetails(session);
 		})
 		.catch(err => {
-			alert('Failed to load session details: ' + err.message);
+			showModal('Error', 'Failed to load session details: ' + err.message, 'error');
 		});
 }
 

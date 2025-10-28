@@ -204,6 +204,9 @@ templ Users(user *auth.User) {
 			}
 		</style>
 
+		<!-- Load modal system -->
+		<script src="/static/modal.js"></script>
+
 		<script>
 			function togglePasswordVisibility(inputId, iconId) {
 				const input = document.getElementById(inputId);
@@ -260,7 +263,7 @@ templ Users(user *auth.User) {
 
 					if (response.ok) {
 						hideCreateUserModal();
-						htmx.trigger('#users-list', 'load');
+						htmx.ajax('GET', '/admin/users/list', {target: '#users-list', swap: 'innerHTML'});
 					} else {
 						const error = await response.json();
 						document.getElementById('create-user-error').textContent = error.error;
@@ -286,7 +289,7 @@ templ Users(user *auth.User) {
 
 					showEditUserModal();
 				} catch (err) {
-					alert('Failed to load user data');
+					showModal('Error', 'Failed to load user data', 'error');
 				}
 			}
 
@@ -317,7 +320,7 @@ templ Users(user *auth.User) {
 
 					if (response.ok) {
 						hideEditUserModal();
-						htmx.trigger('#users-list', 'load');
+						htmx.ajax('GET', '/admin/users/list', {target: '#users-list', swap: 'innerHTML'});
 					} else {
 						const error = await response.json();
 						document.getElementById('edit-user-error').textContent = error.error;
@@ -330,24 +333,27 @@ templ Users(user *auth.User) {
 			}
 
 			async function deleteUser(username) {
-				if (!confirm(`Are you sure you want to delete user "${username}"?`)) {
-					return;
-				}
+				showConfirmModal(
+					'Delete User',
+					`Are you sure you want to delete user "${username}"?`,
+					async function() {
+						try {
+							const response = await fetch(`/admin/users/${username}`, {
+								method: 'DELETE'
+							});
 
-				try {
-					const response = await fetch(`/admin/users/${username}`, {
-						method: 'DELETE'
-					});
-
-					if (response.ok) {
-						htmx.trigger('#users-list', 'load');
-					} else {
-						const error = await response.json();
-						alert(error.error);
+							if (response.ok) {
+								htmx.ajax('GET', '/admin/users/list', {target: '#users-list', swap: 'innerHTML'});
+								showModal('Success', 'User deleted successfully', 'success');
+							} else {
+								const error = await response.json();
+								showModal('Error', error.error, 'error');
+							}
+						} catch (err) {
+							showModal('Error', 'Failed to delete user', 'error');
+						}
 					}
-				} catch (err) {
-					alert('Failed to delete user');
-				}
+				);
 			}
 		</script>
 	}
