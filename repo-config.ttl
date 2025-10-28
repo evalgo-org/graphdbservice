@@ -8,7 +8,7 @@
 @prefix graphdb: <http://www.ontotext.com/config/graphdb#>.
 
 [] a rep:Repository ;
-    rep:repositoryID "autocreated" ;
+    rep:repositoryID "{{.RepoID}}" ;
     rdfs:label "" ;
     rep:repositoryImpl [
         rep:repositoryType "graphdb:SailRepository" ;
