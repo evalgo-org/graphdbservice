@@ -93,7 +93,7 @@ tasks:
     cmds:
       - ~/go/bin/swag init -g cmd/graphdb.go --output docs
       - echo "Swagger documentation generated successfully"
-      - echo "Access at http://localhost:8080/swagger/index.html"
+      - echo "Access at http://localhost:8080/docs/index.html"
 
   vet:
     desc: Run Go vet

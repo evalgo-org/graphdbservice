@@ -1964,8 +1964,8 @@ var graphdbCmd = &cobra.Command{
 		// Static files (no authentication required for JS/CSS)
 		e.Static("/static", "web/static")
 
-		// Swagger documentation (public access)
-		e.GET("/swagger/*", echoSwagger.WrapHandler)
+		// API documentation (public access)
+		e.GET("/docs/*", echoSwagger.WrapHandler)
 
 		// Protected UI routes (require authentication if enabled)
 		ui := e.Group("", AuthMiddleware(authMode))

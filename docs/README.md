@@ -7,7 +7,7 @@ Complete OpenAPI/Swagger documentation for the Pantopix GraphDB Service REST API
 Once the service is running, you can access the interactive Swagger UI at:
 
 ```
-http://localhost:8080/swagger/index.html
+http://localhost:8080/docs/index.html
 ```
 
 Replace `localhost:8080` with your actual host and port configuration.
