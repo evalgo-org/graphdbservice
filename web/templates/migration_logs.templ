@@ -11,14 +11,9 @@ templ MigrationLogs(user *auth.User) {
 		<div class="card">
 			<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
 				<h2 style="margin: 0;">Migration Logs</h2>
-				<div style="display: flex; gap: 1rem;">
-					<button onclick="refreshLogs()" type="button" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
-						Refresh
-					</button>
-					<button onclick="rotateOldLogs()" type="button" style="padding: 0.5rem 1rem; font-size: 0.875rem; background: var(--gray-300); color: var(--gray-800);">
-						Rotate Old Logs
-					</button>
-				</div>
+				<button onclick="rotateOldLogs()" type="button" style="padding: 0.5rem 1rem; font-size: 0.875rem; background: var(--gray-300); color: var(--gray-800);">
+					Rotate Old Logs
+				</button>
 			</div>
 
 			<!-- Statistics Dashboard -->
@@ -149,83 +144,53 @@ templ MigrationLogs(user *auth.User) {
 				font-size: 0.875rem;
 				color: var(--text-secondary);
 			}
+			/* Modal styles */
+			.modal {
+				display: none;
+				position: fixed;
+				z-index: 1000;
+				left: 0;
+				top: 0;
+				width: 100%;
+				height: 100%;
+				overflow: auto;
+				background-color: rgba(0, 0, 0, 0.5);
+			}
+			.modal-content {
+				background-color: white;
+				margin: 5% auto;
+				padding: 0;
+				border-radius: 0.5rem;
+				width: 90%;
+				max-width: 800px;
+				box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+			}
+			.modal-header {
+				padding: 1.5rem;
+				border-bottom: 1px solid var(--gray-200);
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+			}
+			.modal-body {
+				padding: 1.5rem;
+				max-height: 70vh;
+				overflow-y: auto;
+			}
+			.modal-close {
+				color: var(--text-secondary);
+				font-size: 2rem;
+				font-weight: 300;
+				cursor: pointer;
+				line-height: 1;
+			}
+			.modal-close:hover {
+				color: var(--text-primary);
+			}
 		</style>
 
-		<script>
-			function refreshLogs() {
-				htmx.trigger('#stats-dashboard', 'load');
-				htmx.trigger('#sessions-list', 'load');
-			}
-
-			function filterLogs(event) {
-				event.preventDefault();
-				const form = event.target;
-				const formData = new FormData(form);
-				const params = new URLSearchParams(formData);
-
-				const url = `/admin/migrations/list?${params.toString()}`;
-				htmx.ajax('GET', url, {target: '#sessions-list', swap: 'innerHTML'});
-			}
-
-			function clearFilters() {
-				document.getElementById('filter-form').reset();
-				document.getElementById('filter-date').value = new Date().toISOString().split('T')[0];
-				filterLogs({preventDefault: () => {}, target: document.getElementById('filter-form')});
-			}
-
-			async function rotateOldLogs() {
-				if (!confirm('Are you sure you want to rotate old migration logs? This will archive logs older than the retention period.')) {
-					return;
-				}
-
-				try {
-					const response = await fetch('/admin/migrations/rotate', {
-						method: 'POST'
-					});
-
-					if (response.ok) {
-						alert('Old logs rotated successfully');
-					} else {
-						const error = await response.json();
-						alert('Failed to rotate logs: ' + (error.error || 'Unknown error'));
-					}
-				} catch (err) {
-					alert('Failed to rotate logs: ' + err.message);
-				}
-			}
-
-			function viewSession(sessionId) {
-				fetch(`/admin/migrations/session/${sessionId}`)
-					.then(response => response.json())
-					.then(session => {
-						showSessionDetails(session);
-					})
-					.catch(err => {
-						alert('Failed to load session details: ' + err.message);
-					});
-			}
-
-			function showSessionDetails(session) {
-				// Simple approach: navigate to a new page or show a simpler alert
-				// For now, just show JSON in alert (can be improved later)
-				const summary = 'Session: ' + session.id + '\\n' +
-					'User: ' + session.username + '\\n' +
-					'Status: ' + session.status + '\\n' +
-					'Tasks: ' + session.total_tasks + ' (' +
-					session.completed_tasks + ' completed, ' +
-					session.failed_tasks + ' failed)\\n' +
-					'Duration: ' + (session.duration_ms / 1000).toFixed(2) + 's';
-				alert(summary);
-			}
-
-			function formatBytes(bytes) {
-				if (bytes === 0) return '0 B';
-				const k = 1024;
-				const sizes = ['B', 'KB', 'MB', 'GB'];
-				const i = Math.floor(Math.log(bytes) / Math.log(k));
-				return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-			}
-		</script>
+		<!-- Load migration logs JavaScript from external file -->
+		<script src="/static/migration-logs.js"></script>
 	}
 }
 
@@ -289,7 +254,7 @@ templ MigrationSessionsList(sessions []auth.MigrationSession) {
 						<td><code style="font-size: 0.75rem;">{ session.ID[:8] }...</code></td>
 						<td>{ session.Username }</td>
 						<td>{ session.StartTime.Format("2006-01-02 15:04:05") }</td>
-						<td>{ fmt.Sprintf("%.2fs", float64(session.Duration)/1000.0) }</td>
+						<td>{ fmt.Sprintf("%.2f min", float64(session.Duration)/1000.0/60.0) }</td>
 						<td>
 							<span class={ fmt.Sprintf("status-badge status-%s", session.Status) }>
 								{ session.Status }
@@ -330,20 +295,11 @@ func formatDataSize(size interface{}) string {
 	case float64:
 		bytes = int64(v)
 	default:
-		return "0 B"
+		return "0 MB"
 	}
 
-	if bytes == 0 {
-		return "0 B"
-	}
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGT"[exp])
+	// Always display in MB (Megabytes)
+	const megabyte = 1024 * 1024
+	megabytes := float64(bytes) / float64(megabyte)
+	return fmt.Sprintf("%.2f MB", megabytes)
 }

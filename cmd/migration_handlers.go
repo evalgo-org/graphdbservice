@@ -50,8 +50,24 @@ func listMigrationLogsHandler(c echo.Context) error {
 			})
 		}
 
+		// If the date is today, also include active (running) sessions
+		allSessions := summary.Sessions
+		today := time.Now().Format("2006-01-02")
+		if date == today {
+			activeSessions := migrationLogger.GetActiveSessions()
+			// Combine active sessions with completed ones - convert pointers to values
+			combined := make([]auth.MigrationSession, 0, len(activeSessions)+len(summary.Sessions))
+			for _, session := range activeSessions {
+				if session != nil {
+					combined = append(combined, *session)
+				}
+			}
+			combined = append(combined, summary.Sessions...)
+			allSessions = combined
+		}
+
 		// Filter sessions by username and status if specified
-		filteredSessions := filterSessions(summary.Sessions, username, status)
+		filteredSessions := filterSessions(allSessions, username, status)
 
 		// Limit results
 		if len(filteredSessions) > limit {

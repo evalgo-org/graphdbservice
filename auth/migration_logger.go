@@ -115,7 +115,7 @@ func NewMigrationLogger(dataDir string, retentionDays int) (*MigrationLogger, er
 }
 
 // StartSession creates a new migration session
-func (ml *MigrationLogger) StartSession(userID, username, ipAddress, userAgent string, totalTasks int) (*MigrationSession, error) {
+func (ml *MigrationLogger) StartSession(userID, username, ipAddress, userAgent string, totalTasks int, requestJSON string) (*MigrationSession, error) {
 	ml.mu.Lock()
 	defer ml.mu.Unlock()
 
@@ -130,6 +130,11 @@ func (ml *MigrationLogger) StartSession(userID, username, ipAddress, userAgent s
 		TotalTasks:   totalTasks,
 		Tasks:        make([]MigrationTask, 0, totalTasks),
 		Metadata:     make(map[string]interface{}),
+	}
+
+	// Store the original request JSON
+	if requestJSON != "" {
+		session.Metadata["request_json"] = requestJSON
 	}
 
 	ml.activeSessions[session.ID] = session

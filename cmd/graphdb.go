@@ -419,8 +419,11 @@ func migrationHandlerJSON(c echo.Context) error {
 		ipAddress := c.RealIP()
 		userAgent := c.Request().UserAgent()
 
+		// Serialize the request to JSON for logging
+		requestJSON, _ := json.Marshal(req)
+
 		var err error
-		session, err = migrationLogger.StartSession(userID, username, ipAddress, userAgent, len(req.Tasks))
+		session, err = migrationLogger.StartSession(userID, username, ipAddress, userAgent, len(req.Tasks), string(requestJSON))
 		if err != nil {
 			fmt.Printf("Warning: Failed to start migration session logging: %v\n", err)
 		}
@@ -621,8 +624,11 @@ func migrationHandlerMultipart(c echo.Context) error {
 		ipAddress := c.RealIP()
 		userAgent := c.Request().UserAgent()
 
+		// Serialize the request to JSON for logging
+		requestJSON, _ := json.Marshal(req)
+
 		var err error
-		session, err = migrationLogger.StartSession(userID, username, ipAddress, userAgent, len(req.Tasks))
+		session, err = migrationLogger.StartSession(userID, username, ipAddress, userAgent, len(req.Tasks), string(requestJSON))
 		if err != nil {
 			fmt.Printf("Warning: Failed to start migration session logging: %v\n", err)
 		}
@@ -981,11 +987,19 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		if err != nil {
 			return nil, err
 		}
+
+		// Get data file size
+		dataSize := int64(0)
+		if fileInfo, err := os.Stat(dataFile); err == nil {
+			dataSize = fileInfo.Size()
+		}
+
 		_ = os.Remove(confFile)
 		_ = os.Remove(dataFile)
 		result["message"] = "Repository migrated successfully"
 		result["src_repo"] = task.Src.Repo
 		result["tgt_repo"] = task.Tgt.Repo
+		result["data_size"] = dataSize
 
 	case "graph-migration":
 		if identityFile != "" {
@@ -1068,10 +1082,18 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		if !foundRepo {
 			return nil, errors.New("could not find required tgt repository " + task.Tgt.Repo)
 		}
+
+		// Get graph file size
+		dataSize := int64(0)
+		if fileInfo, err := os.Stat(graphFile); err == nil {
+			dataSize = fileInfo.Size()
+		}
+
 		_ = os.Remove(graphFile) // Clean up temporary file
 		result["message"] = "Graph migrated successfully"
 		result["src_graph"] = task.Src.Graph
 		result["tgt_graph"] = task.Tgt.Graph
+		result["data_size"] = dataSize
 
 	case "repo-delete":
 		if identityFile != "" {
@@ -1878,6 +1900,9 @@ var graphdbCmd = &cobra.Command{
 		})
 		e.GET("/login", loginPageHandler)
 		e.POST("/auth/login", loginHandler)
+
+		// Static files (no authentication required for JS/CSS)
+		e.Static("/static", "web/static")
 
 		// Protected UI routes (require authentication if enabled)
 		ui := e.Group("", AuthMiddleware(authMode))

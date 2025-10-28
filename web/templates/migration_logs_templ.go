@@ -47,14 +47,14 @@ func MigrationLogs(user *auth.User) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"card\"><div style=\"display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;\"><h2 style=\"margin: 0;\">Migration Logs</h2><div style=\"display: flex; gap: 1rem;\"><button onclick=\"refreshLogs()\" type=\"button\" style=\"padding: 0.5rem 1rem; font-size: 0.875rem;\">Refresh</button> <button onclick=\"rotateOldLogs()\" type=\"button\" style=\"padding: 0.5rem 1rem; font-size: 0.875rem; background: var(--gray-300); color: var(--gray-800);\">Rotate Old Logs</button></div></div><!-- Statistics Dashboard --><div id=\"stats-dashboard\" hx-get=\"/admin/migrations/stats\" hx-trigger=\"load, every 5s\" hx-swap=\"innerHTML\"><p style=\"color: var(--text-secondary);\">Loading statistics...</p></div><!-- Filters --><div style=\"margin: 1.5rem 0; padding: 1rem; background: var(--gray-100); border-radius: 0.375rem;\"><form id=\"filter-form\" onsubmit=\"filterLogs(event)\" style=\"display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;\"><div class=\"form-group\" style=\"margin: 0; flex: 1; min-width: 200px;\"><label for=\"filter-date\" style=\"font-size: 0.875rem;\">Date</label> <input type=\"date\" id=\"filter-date\" name=\"date\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"card\"><div style=\"display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;\"><h2 style=\"margin: 0;\">Migration Logs</h2><button onclick=\"rotateOldLogs()\" type=\"button\" style=\"padding: 0.5rem 1rem; font-size: 0.875rem; background: var(--gray-300); color: var(--gray-800);\">Rotate Old Logs</button></div><!-- Statistics Dashboard --><div id=\"stats-dashboard\" hx-get=\"/admin/migrations/stats\" hx-trigger=\"load, every 5s\" hx-swap=\"innerHTML\"><p style=\"color: var(--text-secondary);\">Loading statistics...</p></div><!-- Filters --><div style=\"margin: 1.5rem 0; padding: 1rem; background: var(--gray-100); border-radius: 0.375rem;\"><form id=\"filter-form\" onsubmit=\"filterLogs(event)\" style=\"display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;\"><div class=\"form-group\" style=\"margin: 0; flex: 1; min-width: 200px;\"><label for=\"filter-date\" style=\"font-size: 0.875rem;\">Date</label> <input type=\"date\" id=\"filter-date\" name=\"date\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(time.Now().Format("2006-01-02"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 34, Col: 93}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 29, Col: 93}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -67,13 +67,13 @@ func MigrationLogs(user *auth.User) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/admin/migrations/list?date=%s", time.Now().Format("2006-01-02")))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 59, Col: 114}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 54, Col: 114}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" hx-trigger=\"load, every 10s\" hx-swap=\"innerHTML\"><p style=\"color: var(--text-secondary);\">Loading migration sessions...</p></div></div><style>\n\t\t\t.stats-grid {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgrid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n\t\t\t\tgap: 1rem;\n\t\t\t\tmargin-bottom: 1.5rem;\n\t\t\t}\n\t\t\t.stat-card {\n\t\t\t\tbackground: var(--gray-100);\n\t\t\t\tpadding: 1rem;\n\t\t\t\tborder-radius: 0.375rem;\n\t\t\t\tborder-left: 4px solid var(--primary);\n\t\t\t}\n\t\t\t.stat-card.success {\n\t\t\t\tborder-left-color: var(--success);\n\t\t\t}\n\t\t\t.stat-card.error {\n\t\t\t\tborder-left-color: var(--error);\n\t\t\t}\n\t\t\t.stat-card.warning {\n\t\t\t\tborder-left-color: var(--warning);\n\t\t\t}\n\t\t\t.stat-value {\n\t\t\t\tfont-size: 2rem;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: var(--text-primary);\n\t\t\t\tfont-family: \"Noto Serif JP\", serif;\n\t\t\t}\n\t\t\t.stat-label {\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t\tcolor: var(--text-secondary);\n\t\t\t\tmargin-top: 0.25rem;\n\t\t\t}\n\t\t\t.sessions-table {\n\t\t\t\twidth: 100%;\n\t\t\t\tborder-collapse: collapse;\n\t\t\t\tmargin-top: 1rem;\n\t\t\t}\n\t\t\t.sessions-table th {\n\t\t\t\ttext-align: left;\n\t\t\t\tpadding: 0.75rem;\n\t\t\t\tbackground: var(--gray-100);\n\t\t\t\tborder-bottom: 2px solid var(--gray-300);\n\t\t\t\tfont-weight: 600;\n\t\t\t\tcolor: var(--text-primary);\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t}\n\t\t\t.sessions-table td {\n\t\t\t\tpadding: 0.75rem;\n\t\t\t\tborder-bottom: 1px solid var(--gray-200);\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t}\n\t\t\t.sessions-table tr:hover {\n\t\t\t\tbackground: var(--gray-100);\n\t\t\t}\n\t\t\t.status-badge {\n\t\t\t\tdisplay: inline-block;\n\t\t\t\tpadding: 0.25rem 0.75rem;\n\t\t\t\tborder-radius: 9999px;\n\t\t\t\tfont-size: 0.75rem;\n\t\t\t\tfont-weight: 600;\n\t\t\t\ttext-transform: uppercase;\n\t\t\t}\n\t\t\t.status-running {\n\t\t\t\tbackground: #fff3ed;\n\t\t\t\tcolor: var(--primary);\n\t\t\t}\n\t\t\t.status-completed {\n\t\t\t\tbackground: #d1fae5;\n\t\t\t\tcolor: #065f46;\n\t\t\t}\n\t\t\t.status-failed {\n\t\t\t\tbackground: #fee2e2;\n\t\t\t\tcolor: #991b1b;\n\t\t\t}\n\t\t\t.action-link {\n\t\t\t\tcolor: var(--primary);\n\t\t\t\ttext-decoration: none;\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t\tcursor: pointer;\n\t\t\t}\n\t\t\t.action-link:hover {\n\t\t\t\ttext-decoration: underline;\n\t\t\t}\n\t\t\t.task-summary {\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t\tcolor: var(--text-secondary);\n\t\t\t}\n\t\t</style> <script>\n\t\t\tfunction refreshLogs() {\n\t\t\t\thtmx.trigger('#stats-dashboard', 'load');\n\t\t\t\thtmx.trigger('#sessions-list', 'load');\n\t\t\t}\n\n\t\t\tfunction filterLogs(event) {\n\t\t\t\tevent.preventDefault();\n\t\t\t\tconst form = event.target;\n\t\t\t\tconst formData = new FormData(form);\n\t\t\t\tconst params = new URLSearchParams(formData);\n\n\t\t\t\tconst url = `/admin/migrations/list?${params.toString()}`;\n\t\t\t\thtmx.ajax('GET', url, {target: '#sessions-list', swap: 'innerHTML'});\n\t\t\t}\n\n\t\t\tfunction clearFilters() {\n\t\t\t\tdocument.getElementById('filter-form').reset();\n\t\t\t\tdocument.getElementById('filter-date').value = new Date().toISOString().split('T')[0];\n\t\t\t\tfilterLogs({preventDefault: () => {}, target: document.getElementById('filter-form')});\n\t\t\t}\n\n\t\t\tasync function rotateOldLogs() {\n\t\t\t\tif (!confirm('Are you sure you want to rotate old migration logs? This will archive logs older than the retention period.')) {\n\t\t\t\t\treturn;\n\t\t\t\t}\n\n\t\t\t\ttry {\n\t\t\t\t\tconst response = await fetch('/admin/migrations/rotate', {\n\t\t\t\t\t\tmethod: 'POST'\n\t\t\t\t\t});\n\n\t\t\t\t\tif (response.ok) {\n\t\t\t\t\t\talert('Old logs rotated successfully');\n\t\t\t\t\t} else {\n\t\t\t\t\t\tconst error = await response.json();\n\t\t\t\t\t\talert('Failed to rotate logs: ' + (error.error || 'Unknown error'));\n\t\t\t\t\t}\n\t\t\t\t} catch (err) {\n\t\t\t\t\talert('Failed to rotate logs: ' + err.message);\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction viewSession(sessionId) {\n\t\t\t\tfetch(`/admin/migrations/session/${sessionId}`)\n\t\t\t\t\t.then(response => response.json())\n\t\t\t\t\t.then(session => {\n\t\t\t\t\t\tshowSessionDetails(session);\n\t\t\t\t\t})\n\t\t\t\t\t.catch(err => {\n\t\t\t\t\t\talert('Failed to load session details: ' + err.message);\n\t\t\t\t\t});\n\t\t\t}\n\n\t\t\tfunction showSessionDetails(session) {\n\t\t\t\t// Simple approach: navigate to a new page or show a simpler alert\n\t\t\t\t// For now, just show JSON in alert (can be improved later)\n\t\t\t\tconst summary = 'Session: ' + session.id + '\\\\n' +\n\t\t\t\t\t'User: ' + session.username + '\\\\n' +\n\t\t\t\t\t'Status: ' + session.status + '\\\\n' +\n\t\t\t\t\t'Tasks: ' + session.total_tasks + ' (' +\n\t\t\t\t\tsession.completed_tasks + ' completed, ' +\n\t\t\t\t\tsession.failed_tasks + ' failed)\\\\n' +\n\t\t\t\t\t'Duration: ' + (session.duration_ms / 1000).toFixed(2) + 's';\n\t\t\t\talert(summary);\n\t\t\t}\n\n\t\t\tfunction formatBytes(bytes) {\n\t\t\t\tif (bytes === 0) return '0 B';\n\t\t\t\tconst k = 1024;\n\t\t\t\tconst sizes = ['B', 'KB', 'MB', 'GB'];\n\t\t\t\tconst i = Math.floor(Math.log(bytes) / Math.log(k));\n\t\t\t\treturn parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];\n\t\t\t}\n\t\t</script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" hx-trigger=\"load, every 10s\" hx-swap=\"innerHTML\"><p style=\"color: var(--text-secondary);\">Loading migration sessions...</p></div></div><style>\n\t\t\t.stats-grid {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgrid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n\t\t\t\tgap: 1rem;\n\t\t\t\tmargin-bottom: 1.5rem;\n\t\t\t}\n\t\t\t.stat-card {\n\t\t\t\tbackground: var(--gray-100);\n\t\t\t\tpadding: 1rem;\n\t\t\t\tborder-radius: 0.375rem;\n\t\t\t\tborder-left: 4px solid var(--primary);\n\t\t\t}\n\t\t\t.stat-card.success {\n\t\t\t\tborder-left-color: var(--success);\n\t\t\t}\n\t\t\t.stat-card.error {\n\t\t\t\tborder-left-color: var(--error);\n\t\t\t}\n\t\t\t.stat-card.warning {\n\t\t\t\tborder-left-color: var(--warning);\n\t\t\t}\n\t\t\t.stat-value {\n\t\t\t\tfont-size: 2rem;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: var(--text-primary);\n\t\t\t\tfont-family: \"Noto Serif JP\", serif;\n\t\t\t}\n\t\t\t.stat-label {\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t\tcolor: var(--text-secondary);\n\t\t\t\tmargin-top: 0.25rem;\n\t\t\t}\n\t\t\t.sessions-table {\n\t\t\t\twidth: 100%;\n\t\t\t\tborder-collapse: collapse;\n\t\t\t\tmargin-top: 1rem;\n\t\t\t}\n\t\t\t.sessions-table th {\n\t\t\t\ttext-align: left;\n\t\t\t\tpadding: 0.75rem;\n\t\t\t\tbackground: var(--gray-100);\n\t\t\t\tborder-bottom: 2px solid var(--gray-300);\n\t\t\t\tfont-weight: 600;\n\t\t\t\tcolor: var(--text-primary);\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t}\n\t\t\t.sessions-table td {\n\t\t\t\tpadding: 0.75rem;\n\t\t\t\tborder-bottom: 1px solid var(--gray-200);\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t}\n\t\t\t.sessions-table tr:hover {\n\t\t\t\tbackground: var(--gray-100);\n\t\t\t}\n\t\t\t.status-badge {\n\t\t\t\tdisplay: inline-block;\n\t\t\t\tpadding: 0.25rem 0.75rem;\n\t\t\t\tborder-radius: 9999px;\n\t\t\t\tfont-size: 0.75rem;\n\t\t\t\tfont-weight: 600;\n\t\t\t\ttext-transform: uppercase;\n\t\t\t}\n\t\t\t.status-running {\n\t\t\t\tbackground: #fff3ed;\n\t\t\t\tcolor: var(--primary);\n\t\t\t}\n\t\t\t.status-completed {\n\t\t\t\tbackground: #d1fae5;\n\t\t\t\tcolor: #065f46;\n\t\t\t}\n\t\t\t.status-failed {\n\t\t\t\tbackground: #fee2e2;\n\t\t\t\tcolor: #991b1b;\n\t\t\t}\n\t\t\t.action-link {\n\t\t\t\tcolor: var(--primary);\n\t\t\t\ttext-decoration: none;\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t\tcursor: pointer;\n\t\t\t}\n\t\t\t.action-link:hover {\n\t\t\t\ttext-decoration: underline;\n\t\t\t}\n\t\t\t.task-summary {\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t\tcolor: var(--text-secondary);\n\t\t\t}\n\t\t\t/* Modal styles */\n\t\t\t.modal {\n\t\t\t\tdisplay: none;\n\t\t\t\tposition: fixed;\n\t\t\t\tz-index: 1000;\n\t\t\t\tleft: 0;\n\t\t\t\ttop: 0;\n\t\t\t\twidth: 100%;\n\t\t\t\theight: 100%;\n\t\t\t\toverflow: auto;\n\t\t\t\tbackground-color: rgba(0, 0, 0, 0.5);\n\t\t\t}\n\t\t\t.modal-content {\n\t\t\t\tbackground-color: white;\n\t\t\t\tmargin: 5% auto;\n\t\t\t\tpadding: 0;\n\t\t\t\tborder-radius: 0.5rem;\n\t\t\t\twidth: 90%;\n\t\t\t\tmax-width: 800px;\n\t\t\t\tbox-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);\n\t\t\t}\n\t\t\t.modal-header {\n\t\t\t\tpadding: 1.5rem;\n\t\t\t\tborder-bottom: 1px solid var(--gray-200);\n\t\t\t\tdisplay: flex;\n\t\t\t\tjustify-content: space-between;\n\t\t\t\talign-items: center;\n\t\t\t}\n\t\t\t.modal-body {\n\t\t\t\tpadding: 1.5rem;\n\t\t\t\tmax-height: 70vh;\n\t\t\t\toverflow-y: auto;\n\t\t\t}\n\t\t\t.modal-close {\n\t\t\t\tcolor: var(--text-secondary);\n\t\t\t\tfont-size: 2rem;\n\t\t\t\tfont-weight: 300;\n\t\t\t\tcursor: pointer;\n\t\t\t\tline-height: 1;\n\t\t\t}\n\t\t\t.modal-close:hover {\n\t\t\t\tcolor: var(--text-primary);\n\t\t\t}\n\t\t</style> <!-- Load migration logs JavaScript from external file --> <script src=\"/static/migration-logs.js\"></script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -115,7 +115,7 @@ func MigrationStatsDashboard(stats map[string]interface{}) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(stats["active_sessions"]))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 235, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 200, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -128,7 +128,7 @@ func MigrationStatsDashboard(stats map[string]interface{}) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(stats["completed_sessions"]))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 239, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 204, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -141,7 +141,7 @@ func MigrationStatsDashboard(stats map[string]interface{}) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(stats["failed_sessions"]))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 243, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 208, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -154,7 +154,7 @@ func MigrationStatsDashboard(stats map[string]interface{}) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(stats["total_tasks"]))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 247, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 212, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -167,7 +167,7 @@ func MigrationStatsDashboard(stats map[string]interface{}) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(stats["completed_tasks"]))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 251, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 216, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -180,7 +180,7 @@ func MigrationStatsDashboard(stats map[string]interface{}) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(stats["failed_tasks"]))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 255, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 220, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -193,7 +193,7 @@ func MigrationStatsDashboard(stats map[string]interface{}) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(stats["timeout_tasks"]))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 259, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 224, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -206,7 +206,7 @@ func MigrationStatsDashboard(stats map[string]interface{}) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(formatDataSize(stats["total_data_size"]))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 263, Col: 69}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 228, Col: 69}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -259,7 +259,7 @@ func MigrationSessionsList(sessions []auth.MigrationSession) templ.Component {
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(session.ID[:8])
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 289, Col: 60}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 254, Col: 60}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 				if templ_7745c5c3_Err != nil {
@@ -272,7 +272,7 @@ func MigrationSessionsList(sessions []auth.MigrationSession) templ.Component {
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(session.Username)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 290, Col: 28}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 255, Col: 28}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
@@ -285,7 +285,7 @@ func MigrationSessionsList(sessions []auth.MigrationSession) templ.Component {
 				var templ_7745c5c3_Var17 string
 				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(session.StartTime.Format("2006-01-02 15:04:05"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 291, Col: 59}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 256, Col: 59}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 				if templ_7745c5c3_Err != nil {
@@ -296,9 +296,9 @@ func MigrationSessionsList(sessions []auth.MigrationSession) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var18 string
-				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.2fs", float64(session.Duration)/1000.0))
+				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.2f min", float64(session.Duration)/1000.0/60.0))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 292, Col: 66}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 257, Col: 74}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -333,7 +333,7 @@ func MigrationSessionsList(sessions []auth.MigrationSession) templ.Component {
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(session.Status)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 295, Col: 24}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 260, Col: 24}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -346,7 +346,7 @@ func MigrationSessionsList(sessions []auth.MigrationSession) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d total", session.TotalTasks))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 300, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 265, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
@@ -364,7 +364,7 @@ func MigrationSessionsList(sessions []auth.MigrationSession) templ.Component {
 					var templ_7745c5c3_Var23 string
 					templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(session.CompletedTasks))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 302, Col: 91}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 267, Col: 91}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 					if templ_7745c5c3_Err != nil {
@@ -383,7 +383,7 @@ func MigrationSessionsList(sessions []auth.MigrationSession) templ.Component {
 					var templ_7745c5c3_Var24 string
 					templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(session.FailedTasks))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 305, Col: 86}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 270, Col: 86}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 					if templ_7745c5c3_Err != nil {
@@ -402,7 +402,7 @@ func MigrationSessionsList(sessions []auth.MigrationSession) templ.Component {
 					var templ_7745c5c3_Var25 string
 					templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(session.TimeoutTasks))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 308, Col: 89}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 273, Col: 89}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 					if templ_7745c5c3_Err != nil {
@@ -420,7 +420,7 @@ func MigrationSessionsList(sessions []auth.MigrationSession) templ.Component {
 				var templ_7745c5c3_Var26 string
 				templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(formatDataSize(session.TotalDataSize))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 312, Col: 49}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/migration_logs.templ`, Line: 277, Col: 49}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 				if templ_7745c5c3_Err != nil {
@@ -467,22 +467,13 @@ func formatDataSize(size interface{}) string {
 	case float64:
 		bytes = int64(v)
 	default:
-		return "0 B"
+		return "0 MB"
 	}
 
-	if bytes == 0 {
-		return "0 B"
-	}
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGT"[exp])
+	// Always display in MB (Megabytes)
+	const megabyte = 1024 * 1024
+	megabytes := float64(bytes) / float64(megabyte)
+	return fmt.Sprintf("%.2f MB", megabytes)
 }
 
 var _ = templruntime.GeneratedTemplate

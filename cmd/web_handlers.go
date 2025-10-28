@@ -22,6 +22,11 @@ type TaskSession struct {
 	mutex     sync.RWMutex
 	StartTime time.Time
 	EndTime   *time.Time
+	// User context for migration logging
+	UserID    string
+	Username  string
+	IPAddress string
+	UserAgent string
 }
 
 var (
@@ -172,6 +177,13 @@ func uiExecuteHandler(c echo.Context) error {
 		`)
 	}
 
+	// Get user context for migration logging
+	userID, username, _, authenticated := GetCurrentUser(c)
+	if !authenticated {
+		userID = "anonymous"
+		username = "anonymous"
+	}
+
 	// Create session
 	sessionID := uuid.New().String()
 	session := &TaskSession{
@@ -179,6 +191,10 @@ func uiExecuteHandler(c echo.Context) error {
 		Tasks:     make([]templates.TaskStatus, len(req.Tasks)),
 		Clients:   make(map[chan templates.TaskStatus]bool),
 		StartTime: time.Now(),
+		UserID:    userID,
+		Username:  username,
+		IPAddress: c.RealIP(),
+		UserAgent: c.Request().UserAgent(),
 	}
 
 	// Initialize task statuses
@@ -307,6 +323,31 @@ func executeTasksWithUpdates(sessionID string, req MigrationRequest) {
 		return
 	}
 
+	// Start migration session logging (if auth is enabled)
+	var migrationSession *auth.MigrationSession
+	if migrationLogger != nil {
+		// Serialize the request to JSON for logging
+		requestJSON, _ := json.Marshal(req)
+
+		var err error
+		migrationSession, err = migrationLogger.StartSession(
+			session.UserID,
+			session.Username,
+			session.IPAddress,
+			session.UserAgent,
+			len(req.Tasks),
+			string(requestJSON),
+		)
+		if err != nil {
+			fmt.Printf("Warning: Failed to start migration session logging: %v\n", err)
+		} else {
+			fmt.Printf("Started migration logging session: %s for user %s\n", migrationSession.ID, session.Username)
+		}
+	}
+
+	// Track if any errors occurred
+	hasError := false
+
 	// Execute each task
 	for i, task := range req.Tasks {
 		// Record start time
@@ -323,8 +364,33 @@ func executeTasksWithUpdates(sessionID string, req MigrationRequest) {
 		// Broadcast update
 		broadcastTaskUpdate(session, taskUpdate)
 
+		// Log task start
+		if migrationSession != nil {
+			repoID := ""
+			graphID := ""
+			if task.Src != nil {
+				repoID = task.Src.Repo
+				if task.Src.Graph != "" {
+					graphID = task.Src.Graph
+				}
+			}
+			srcURL := ""
+			if task.Src != nil {
+				srcURL = task.Src.URL
+			}
+			tgtURL := ""
+			if task.Tgt != nil {
+				tgtURL = task.Tgt.URL
+			}
+
+			if err := migrationLogger.StartTask(migrationSession.ID, i, task.Action, srcURL, tgtURL, repoID, graphID); err != nil {
+				fmt.Printf("Warning: Failed to log task start: %v\n", err)
+			}
+		}
+
 		// Validate task
 		if err := validateTask(task); err != nil {
+			hasError = true
 			taskEndTime := time.Now()
 			duration := taskEndTime.Sub(taskStartTime)
 
@@ -335,6 +401,13 @@ func executeTasksWithUpdates(sessionID string, req MigrationRequest) {
 			session.Tasks[i].Duration = formatDuration(duration)
 			taskUpdate = session.Tasks[i]
 			session.mutex.Unlock()
+
+			// Log task failure
+			if migrationSession != nil {
+				if logErr := migrationLogger.FailTask(migrationSession.ID, i, "validation_error", err.Error(), 0); logErr != nil {
+					fmt.Printf("Warning: Failed to log task failure: %v\n", logErr)
+				}
+			}
 
 			broadcastTaskUpdate(session, taskUpdate)
 			continue
@@ -362,14 +435,39 @@ func executeTasksWithUpdates(sessionID string, req MigrationRequest) {
 
 			session.mutex.Lock()
 			if res.err != nil {
+				hasError = true
 				session.Tasks[i].Status = "error"
 				session.Tasks[i].Message = fmt.Sprintf("Error: %v", res.err)
+
+				// Log task failure
+				if migrationSession != nil {
+					if logErr := migrationLogger.FailTask(migrationSession.ID, i, "execution_error", res.err.Error(), 0); logErr != nil {
+						fmt.Printf("Warning: Failed to log task failure: %v\n", logErr)
+					}
+				}
 			} else {
 				session.Tasks[i].Status = "success"
 				if msg, ok := res.result["message"].(string); ok {
 					session.Tasks[i].Message = msg
 				} else {
 					session.Tasks[i].Message = "Task completed successfully"
+				}
+
+				// Log task success
+				if migrationSession != nil {
+					dataSize := int64(0)
+					tripleCount := int64(0)
+					// Extract metrics from result if available
+					if size, ok := res.result["data_size"].(int64); ok {
+						dataSize = size
+					}
+					if count, ok := res.result["triple_count"].(int64); ok {
+						tripleCount = count
+					}
+
+					if err := migrationLogger.CompleteTask(migrationSession.ID, i, dataSize, tripleCount); err != nil {
+						fmt.Printf("Warning: Failed to log task completion: %v\n", err)
+					}
 				}
 			}
 			session.Tasks[i].EndTime = taskEndTime.Format("15:04:05")
@@ -378,6 +476,7 @@ func executeTasksWithUpdates(sessionID string, req MigrationRequest) {
 			session.mutex.Unlock()
 
 		case <-time.After(10 * time.Minute): // 10 minute timeout per task
+			hasError = true
 			taskEndTime := time.Now()
 			duration := taskEndTime.Sub(taskStartTime)
 
@@ -388,6 +487,13 @@ func executeTasksWithUpdates(sessionID string, req MigrationRequest) {
 			session.Tasks[i].Duration = formatDuration(duration)
 			taskUpdate = session.Tasks[i]
 			session.mutex.Unlock()
+
+			// Log task timeout
+			if migrationSession != nil {
+				if logErr := migrationLogger.TimeoutTask(migrationSession.ID, i, duration); logErr != nil {
+					fmt.Printf("Warning: Failed to log task timeout: %v\n", logErr)
+				}
+			}
 		}
 
 		// Broadcast final update
@@ -399,6 +505,21 @@ func executeTasksWithUpdates(sessionID string, req MigrationRequest) {
 	session.mutex.Lock()
 	session.EndTime = &now
 	session.mutex.Unlock()
+
+	// Complete or fail the migration session
+	if migrationSession != nil {
+		if hasError {
+			if err := migrationLogger.FailSession(migrationSession.ID, "One or more tasks failed"); err != nil {
+				fmt.Printf("Warning: Failed to mark migration session as failed: %v\n", err)
+			}
+		} else {
+			if err := migrationLogger.CompleteSession(migrationSession.ID); err != nil {
+				fmt.Printf("Warning: Failed to complete migration session: %v\n", err)
+			} else {
+				fmt.Printf("Completed migration logging session: %s\n", migrationSession.ID)
+			}
+		}
+	}
 
 	// Cleanup session after 1 hour
 	time.AfterFunc(1*time.Hour, func() {
