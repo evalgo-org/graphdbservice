@@ -9,11 +9,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	// eve "eve.evalgo.org/common"
 	"eve.evalgo.org/db"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
 	"github.com/labstack/echo/v4"
@@ -1034,8 +1036,9 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 					}
 					defer func() { _ = file.Close() }()
 
-					// Save file temporarily
-					tempFileName := fmt.Sprintf("/tmp/%s", fileHeader.Filename)
+					// Save file temporarily with unique UUID-based filename to avoid conflicts
+					fileExt := filepath.Ext(fileHeader.Filename)
+					tempFileName := filepath.Join(os.TempDir(), fmt.Sprintf("repo_import_%s%s", uuid.New().String(), fileExt))
 					defer func() { _ = os.Remove(tempFileName) }()
 
 					tempFile, err := os.Create(tempFileName)
@@ -1113,8 +1116,9 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		}
 		defer func() { _ = file.Close() }()
 
-		// Save uploaded config to temporary file
-		configFile := fmt.Sprintf("/tmp/repo_create_%s_%s", md5Hash(repoName), fileHeader.Filename)
+		// Save uploaded config to temporary file with unique UUID-based filename to avoid conflicts
+		fileExt := filepath.Ext(fileHeader.Filename)
+		configFile := filepath.Join(os.TempDir(), fmt.Sprintf("repo_create_%s%s", uuid.New().String(), fileExt))
 		defer func() { _ = os.Remove(configFile) }()
 
 		tempFile, err := os.Create(configFile)
@@ -1284,8 +1288,9 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 						}
 						defer func() { _ = file.Close() }()
 
-						// Save file temporarily and import it
-						tempFileName := fmt.Sprintf("/tmp/%s", fileHeader.Filename)
+						// Save file temporarily with unique UUID-based filename to avoid conflicts
+						fileExt := filepath.Ext(fileHeader.Filename)
+						tempFileName := filepath.Join(os.TempDir(), fmt.Sprintf("graph_import_%s%s", uuid.New().String(), fileExt))
 						fmt.Printf("DEBUG: Creating temp file: %s\n", tempFileName)
 
 						tempFile, err := os.Create(tempFileName)
@@ -1407,8 +1412,8 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 				continue // Skip empty graph URIs
 			}
 
-			// Create a unique filename for each graph
-			graphFileName := fmt.Sprintf("/tmp/repo_rename_%s_%s.rdf", md5Hash(oldRepoName), md5Hash(graphURI))
+			// Create a unique filename for each graph using UUID to avoid conflicts
+			graphFileName := filepath.Join(os.TempDir(), fmt.Sprintf("repo_rename_%s.rdf", uuid.New().String()))
 
 			err := db.GraphDBExportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, oldRepoName, graphURI, graphFileName)
 			if err != nil {
@@ -1564,8 +1569,8 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 			return nil, fmt.Errorf("target graph '%s' already exists in repository '%s'", newGraphName, repoName)
 		}
 
-		// Step 3: Export the old graph to a temporary file
-		tempFileName := fmt.Sprintf("/tmp/graph_rename_%s.rdf", md5Hash(oldGraphName))
+		// Step 3: Export the old graph to a temporary file with unique UUID to avoid conflicts
+		tempFileName := filepath.Join(os.TempDir(), fmt.Sprintf("graph_rename_%s.rdf", uuid.New().String()))
 		defer func() { _ = os.Remove(tempFileName) }() // Clean up temporary file
 
 		err = db.GraphDBExportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, repoName, oldGraphName, tempFileName)
