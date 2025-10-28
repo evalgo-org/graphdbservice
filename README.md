@@ -39,15 +39,21 @@ A comprehensive RESTful API service for managing GraphDB repositories and RDF gr
 ### Advanced Features
 - **Ziti Zero-Trust Networking**: Secure connectivity via OpenZiti overlay networks
 - **API Key Authentication**: Protect all endpoints with API key authentication
+- **User Authentication & RBAC**: Web UI authentication with role-based access control
+- **User Management**: Complete admin interface for managing users, roles, and permissions
+- **Web UI**: Interactive web interface with HTMX for real-time updates
 - **Multipart Form Uploads**: Support for configuration and data file uploads
 - **Multiple RDF Formats**: Support for RDF/XML, Turtle, N-Triples, JSON-LD, and Binary RDF
 - **Error Handling**: Comprehensive error reporting with detailed messages
+- **Audit Logging**: Track all user actions and system events
 - **Logging**: Structured logging for debugging and monitoring
 
 ## Architecture
 
 The service is built using:
 - **Echo Framework**: High-performance HTTP server and routing
+- **Templ**: Type-safe Go HTML templates for the web UI
+- **HTMX**: Modern interactive UI with server-sent events
 - **Cobra**: Powerful CLI framework for command-line interface
 - **Viper**: Flexible configuration management
 - **Eve Library**: Shared utilities and GraphDB client from eve.evalgo.org
@@ -56,15 +62,35 @@ The service is built using:
 
 ```
 pxgraphservice/
-├── main.go              # Application entry point
-├── cmd/                 # Command-line interface
-│   ├── root.go         # Root command and configuration
-│   ├── version.go      # Version command
-│   ├── graphdb.go      # GraphDB service command and API handlers
-│   └── graphdb_test.go # Comprehensive unit tests
-├── go.mod              # Go module dependencies
-├── taskfile.yml        # Task automation
-└── README.md           # This file
+├── main.go                  # Application entry point
+├── cmd/                     # Command-line interface & handlers
+│   ├── root.go             # Root command and configuration
+│   ├── version.go          # Version command
+│   ├── graphdb.go          # GraphDB service command and API handlers
+│   ├── graphdb_test.go     # Comprehensive unit tests
+│   ├── web_handlers.go     # Web UI handlers
+│   ├── auth_init.go        # Authentication initialization
+│   ├── auth_handlers.go    # Login/logout handlers
+│   ├── auth_middleware.go  # Authentication & authorization middleware
+│   └── user_handlers.go    # User management API handlers
+├── auth/                    # Authentication package
+│   ├── models.go           # User, Claims, and database models
+│   ├── password.go         # Password hashing and validation
+│   ├── jwt.go              # JWT token generation and validation
+│   ├── storage.go          # File-based user storage with locking
+│   ├── *_test.go           # Comprehensive unit tests (60+ tests)
+├── web/                     # Web UI templates
+│   └── templates/          # Templ templates
+│       ├── layout.templ    # Base layout with navbar
+│       ├── index.templ     # Main task execution page
+│       ├── login.templ     # Login page
+│       ├── users.templ     # User management page
+│       └── change_password.templ  # Password change page
+├── data/                    # Runtime data (not in version control)
+│   └── users/              # User database and backups
+├── go.mod                   # Go module dependencies
+├── taskfile.yml             # Task automation
+└── README.md                # This file
 ```
 
 ## Installation
@@ -105,7 +131,11 @@ docker run -d \
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `API_KEY` | API key for authentication | - | Yes |
+| `API_KEY` | API key for REST API authentication | - | Yes (for API) |
+| `AUTH_MODE` | Authentication mode: `none`, `simple`, `rbac` | `none` | No |
+| `JWT_SECRET` | Secret key for JWT token signing | - | Yes (if AUTH_MODE ≠ none) |
+| `SESSION_TIMEOUT` | Session timeout in seconds | 3600 | No |
+| `DATA_DIR` | Directory for user data storage | `./data` | No |
 | `PORT` | HTTP server port | 8080 | No |
 
 ### Configuration File
@@ -121,10 +151,10 @@ license: "apache"
 
 ### Starting the Service
 
-Basic usage:
+#### Without Authentication (Default)
 
 ```bash
-# Set required environment variables
+# Set required API key for REST API
 export API_KEY=your-secret-api-key
 
 # Start the service (default port 8080)
@@ -136,6 +166,96 @@ graphservice graphdb
 
 # With Ziti identity for secure networking
 graphservice graphdb --identity /path/to/ziti-identity.json
+```
+
+#### With User Authentication (RBAC)
+
+```bash
+# Enable RBAC authentication mode
+export AUTH_MODE=rbac
+export JWT_SECRET=your-long-random-secret-key-min-32-chars
+export API_KEY=your-api-key
+
+# Start the service
+graphservice graphdb
+
+# On first startup, an initial admin user will be created
+# Credentials will be displayed in the console - save them!
+# Example output:
+#   Username: admin
+#   Password: +SEZpz)22l2p[cIY
+```
+
+#### Accessing the Web UI
+
+```bash
+# Without authentication (AUTH_MODE=none)
+# Navigate to: http://localhost:8080/
+
+# With authentication (AUTH_MODE=rbac or simple)
+# Navigate to: http://localhost:8080/login
+# Login with the admin credentials shown on first startup
+```
+
+### Web UI Features
+
+#### Main Task Execution Page
+
+The web UI provides an interactive interface for executing GraphDB operations:
+
+1. **Task JSON Input**: Paste or type your task JSON definition
+2. **Load Example**: Click to load a sample migration task
+3. **Execute Tasks**: Submit tasks and watch real-time progress
+4. **Server-Sent Events**: Live updates of task status using SSE
+5. **Enhanced Error Messages**: Clear, descriptive error messages with JSON validation
+
+#### User Management (Admin Only)
+
+Access the user management page at `/admin/users` (requires admin role):
+
+**Features:**
+- **List Users**: View all users with their roles, status, and activity
+- **Create User**: Add new users with username, password, email, and role
+- **Edit User**: Update user details, roles, and status
+- **Delete User**: Remove users (with self-deletion prevention)
+- **Lock/Unlock Accounts**: Control user access
+- **Reset Failed Logins**: Unlock accounts after failed login attempts
+- **Set Password Policy**: Force password change on first login
+
+**User Management Operations:**
+```
+1. Login as admin
+2. Click "Manage Users" in the navbar
+3. View user list with detailed information
+4. Click "Create New User" to add users
+5. Click "Edit" to modify user details
+6. Click "Delete" to remove users
+```
+
+#### Password Management
+
+All authenticated users can change their password at `/profile/change-password`:
+
+**Features:**
+- Current password verification
+- Strong password requirements:
+  - Minimum 8 characters
+  - At least one uppercase letter
+  - At least one lowercase letter
+  - At least one number
+  - At least one special character
+- Client-side and server-side validation
+- Clear error messages and hints
+- Automatic redirect after successful change
+
+**Password Change Process:**
+```
+1. Login with your credentials
+2. Click "Change Password" in the navbar
+3. Enter current password
+4. Enter new password (must meet requirements)
+5. Confirm new password
+6. Click "Change Password"
 ```
 
 ### API Operations
@@ -286,16 +406,28 @@ go test -v ./...
 go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
 
+# Run only auth tests
+go test -v ./auth/...
+
 # Using task
 task test
 ```
 
 The test suite includes:
+
+**GraphDB Operations (cmd/):**
 - Mock HTTP server for GraphDB API
 - Tests for all GraphDB operations
 - Helper function tests
 - Validation tests
-- Authentication tests
+
+**Authentication (auth/):**
+- Password hashing and validation (8 tests)
+- JWT token generation and validation (6 tests)
+- User storage operations (12 tests)
+- File locking and concurrency
+- Persistence and backup tests
+- **Total: 60+ authentication tests, all passing**
 
 #### Integration Tests
 
@@ -381,9 +513,89 @@ The service supports the following RDF serialization formats:
 
 ## Security Considerations
 
+### Authentication Modes
+
+The service supports three authentication modes:
+
+#### 1. None Mode (Default - `AUTH_MODE=none`)
+- No web UI authentication required
+- API key still required for REST API endpoints
+- Suitable for trusted internal networks
+- Backward compatible with existing deployments
+
+#### 2. Simple Mode (`AUTH_MODE=simple`)
+- Basic username/password authentication
+- JWT-based session management
+- Single role: all authenticated users have same permissions
+- Good for simple deployments
+
+#### 3. RBAC Mode (`AUTH_MODE=rbac`)
+- Role-Based Access Control
+- Two roles: `admin` and `user`
+- Admins can manage users and access all features
+- Regular users can execute tasks and change passwords
+- Recommended for production environments
+
+### Web UI Authentication
+
+When authentication is enabled (`AUTH_MODE=simple` or `AUTH_MODE=rbac`):
+
+**Features:**
+- JWT-based sessions with configurable timeout
+- HTTP-only, Secure, SameSite=Strict cookies
+- Automatic session expiration
+- Failed login tracking (locks account after 5 attempts)
+- Password strength requirements enforced
+- Account locking/unlocking by admins
+
+**Security Measures:**
+```bash
+# Generate a strong JWT secret (minimum 32 characters)
+export JWT_SECRET=$(openssl rand -base64 32)
+
+# Set session timeout (in seconds, default 3600 = 1 hour)
+export SESSION_TIMEOUT=3600
+
+# Enable RBAC mode
+export AUTH_MODE=rbac
+```
+
+### User Data Storage
+
+User data is stored in the filesystem with strong security:
+
+- **Location**: `${DATA_DIR}/users/` (default: `./data/users/`)
+- **Format**: JSON with bcrypt password hashes
+- **Permissions**: Files are created with 0600 (owner read/write only)
+- **Concurrency**: File locking prevents race conditions
+- **Backups**: Automatic backup before each modification
+- **Schema Version**: Versioned format for future migrations
+
+**User Database Structure:**
+```json
+{
+  "version": "1.0.0",
+  "users": {
+    "admin": {
+      "id": "uuid",
+      "username": "admin",
+      "password_hash": "bcrypt-hash",
+      "role": "admin",
+      "created_at": "timestamp",
+      "updated_at": "timestamp",
+      "last_login_at": "timestamp",
+      "failed_logins": 0,
+      "locked": false,
+      "must_change_password": false
+    }
+  },
+  "updated_at": "timestamp"
+}
+```
+
 ### API Key Authentication
 
-All API endpoints require a valid API key in the `x-api-key` header:
+All REST API endpoints require a valid API key in the `x-api-key` header:
 
 ```bash
 curl -H "x-api-key: your-secret-key" http://localhost:8080/v1/api/action
@@ -405,11 +617,16 @@ This enables:
 
 ### Best Practices
 
-1. **Rotate API Keys**: Change API keys regularly
-2. **Use HTTPS**: Always use TLS in production
-3. **Limit Network Access**: Use firewalls or Ziti to restrict access
-4. **Monitor Logs**: Review logs for suspicious activity
-5. **Backup Data**: Regular backups of GraphDB repositories
+1. **Use RBAC Mode**: Enable `AUTH_MODE=rbac` for production
+2. **Strong JWT Secret**: Use a minimum 32-character random secret
+3. **Rotate Secrets**: Change JWT_SECRET and API_KEY regularly
+4. **Use HTTPS**: Always use TLS in production
+5. **Secure Data Directory**: Ensure proper file system permissions on `DATA_DIR`
+6. **Change Default Password**: Force users to change password on first login
+7. **Monitor Failed Logins**: Review audit logs for suspicious activity
+8. **Backup User Data**: Regular backups of `./data/users/`
+9. **Limit Network Access**: Use firewalls or Ziti to restrict access
+10. **Session Timeout**: Configure appropriate SESSION_TIMEOUT for your security needs
 
 ## Troubleshooting
 
