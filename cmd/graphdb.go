@@ -1653,6 +1653,12 @@ var graphdbCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		identityFile, _ = cmd.Flags().GetString("identity")
 
+		// Initialize authentication system
+		if err := InitializeAuth(); err != nil {
+			fmt.Printf("FATAL: Failed to initialize authentication: %v\n", err)
+			os.Exit(1)
+		}
+
 		e := echo.New()
 
 		// Add request size limit (100MB)
@@ -1676,29 +1682,43 @@ var graphdbCmd = &cobra.Command{
 		// Add logging and recovery middleware
 		e.Use(middleware.Logger())
 		e.Use(middleware.Recover())
-		// Apply API key middleware and register the migration handler
+
+		// Get authentication mode
+		authMode := getAuthMode()
+
+		// API routes (require API key)
 		e.POST("/v1/api/action", migrationHandler, apiKeyMiddleware)
 
-		// Health check endpoint (without API key requirement)
+		// Public routes (no authentication required)
 		e.GET("/health", func(c echo.Context) error {
 			return c.JSON(http.StatusOK, map[string]string{"status": "healthy"})
 		})
-
-		// Favicon endpoint (prevent 404 errors)
 		e.GET("/favicon.ico", func(c echo.Context) error {
 			return c.NoContent(http.StatusNoContent)
 		})
+		e.GET("/login", loginPageHandler)
+		e.POST("/auth/login", loginHandler)
 
-		// Web UI routes (without API key requirement)
-		e.GET("/", uiIndexHandler)
-		e.GET("/ui", uiIndexHandler)
-		e.POST("/ui/execute", uiExecuteHandler)
-		e.GET("/ui/stream/:sessionID", uiStreamHandler)
+		// Protected UI routes (require authentication if enabled)
+		ui := e.Group("", AuthMiddleware(authMode))
+		ui.GET("/", uiIndexHandler)
+		ui.GET("/ui", uiIndexHandler)
+		ui.POST("/ui/execute", uiExecuteHandler)
+		ui.GET("/ui/stream/:sessionID", uiStreamHandler)
+		ui.GET("/logout", logoutHandler)
 
 		port := os.Getenv("PORT")
 		if port == "" {
 			port = "8080"
 		}
+
+		fmt.Printf("\nGraphDB Service starting on port %s\n", port)
+		fmt.Printf("Web UI: http://localhost:%s/\n", port)
+		if authMode != "none" {
+			fmt.Printf("Login page: http://localhost:%s/login\n", port)
+		}
+		fmt.Println()
+
 		// Start server
 		e.Logger.Fatal(e.Start(":" + port))
 	},
