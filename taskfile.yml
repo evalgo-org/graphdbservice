@@ -146,6 +146,7 @@ tasks:
   image-build-local:
     desc: Build and push Docker image
     cmds:
+      - rm -rf ./data || true
       - nixpacks build . --name private.hz.pantopix.net/pxgraphdb/service:{{.VERS}}
       - docker tag private.hz.pantopix.net/pxgraphdb/service:{{.VERS}} private.hz.pantopix.net/pxgraphdb/service:latest
       - docker push private.hz.pantopix.net/pxgraphdb/service:{{.VERS}}
