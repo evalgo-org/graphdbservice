@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,6 +28,90 @@ var (
 	sessionsMutex sync.RWMutex
 )
 
+// formatJSONError converts a JSON parsing error into a user-friendly message
+func formatJSONError(err error, jsonStr string) string {
+	errMsg := err.Error()
+
+	// Handle syntax errors with position information
+	if syntaxErr, ok := err.(*json.SyntaxError); ok {
+		line, col, snippet := getErrorLocation(jsonStr, syntaxErr.Offset)
+		return fmt.Sprintf(
+			"%s at line %d, column %d<br><br><code style=\"background: #f5f5f5; padding: 0.5rem; display: block; border-radius: 4px;\">%s</code><br><small>Hint: Check for missing commas, quotes, brackets, or trailing commas</small>",
+			errMsg, line, col, snippet,
+		)
+	}
+
+	// Handle type errors
+	if typeErr, ok := err.(*json.UnmarshalTypeError); ok {
+		return fmt.Sprintf(
+			"Type mismatch in field '%s': expected %s but got %s<br><small>Hint: Check that field values match the expected data type (string, number, object, array)</small>",
+			typeErr.Field, typeErr.Type, typeErr.Value,
+		)
+	}
+
+	// Handle common JSON errors with helpful hints
+	lowerErr := strings.ToLower(errMsg)
+	switch {
+	case strings.Contains(lowerErr, "unexpected end of json"):
+		return "Unexpected end of JSON input<br><small>Hint: The JSON is incomplete. Check for missing closing brackets '}' or ']'</small>"
+	case strings.Contains(lowerErr, "invalid character"):
+		if strings.Contains(lowerErr, "after object key") {
+			return fmt.Sprintf("%s<br><small>Hint: Check for missing colon ':' after a property name, or missing comma ',' between properties</small>", errMsg)
+		}
+		if strings.Contains(lowerErr, "looking for beginning of value") {
+			return fmt.Sprintf("%s<br><small>Hint: Check for trailing commas or missing values</small>", errMsg)
+		}
+		return fmt.Sprintf("%s<br><small>Hint: Look for special characters, unescaped quotes, or formatting issues</small>", errMsg)
+	case strings.Contains(lowerErr, "expecting property name"):
+		return "Expecting property name enclosed in double quotes<br><small>Hint: All object keys must be enclosed in double quotes, e.g., \"key\": \"value\"</small>"
+	default:
+		return fmt.Sprintf("%s<br><small>Hint: Validate your JSON using a JSON validator tool or check the example format</small>", errMsg)
+	}
+}
+
+// getErrorLocation finds the line, column, and context snippet for a JSON error
+func getErrorLocation(jsonStr string, offset int64) (line int, col int, snippet string) {
+	line = 1
+	col = 1
+	lastLineStart := 0
+
+	for i := 0; i < int(offset) && i < len(jsonStr); i++ {
+		if jsonStr[i] == '\n' {
+			line++
+			col = 1
+			lastLineStart = i + 1
+		} else {
+			col++
+		}
+	}
+
+	// Extract the problematic line
+	lineEnd := lastLineStart
+	for lineEnd < len(jsonStr) && jsonStr[lineEnd] != '\n' {
+		lineEnd++
+	}
+
+	snippet = strings.TrimSpace(jsonStr[lastLineStart:lineEnd])
+	if len(snippet) > 80 {
+		// Truncate long lines but show the error position
+		start := col - 40
+		if start < 0 {
+			start = 0
+		}
+		end := start + 80
+		if end > len(snippet) {
+			end = len(snippet)
+		}
+		snippet = "..." + snippet[start:end] + "..."
+	}
+
+	// Add a pointer to the error position
+	pointer := strings.Repeat(" ", col-1) + "^"
+	snippet = snippet + "\n" + pointer
+
+	return line, col, snippet
+}
+
 // uiIndexHandler serves the main UI page
 func uiIndexHandler(c echo.Context) error {
 	component := templates.Index()
@@ -40,7 +125,7 @@ func uiExecuteHandler(c echo.Context) error {
 	if taskJSON == "" {
 		return c.HTML(http.StatusBadRequest, `
 			<div class="alert alert-error">
-				Task JSON is required
+				<strong>Error:</strong> Task JSON is required
 			</div>
 		`)
 	}
@@ -48,11 +133,13 @@ func uiExecuteHandler(c echo.Context) error {
 	// Parse the migration request
 	var req MigrationRequest
 	if err := json.Unmarshal([]byte(taskJSON), &req); err != nil {
+		// Generate user-friendly error message
+		friendlyMsg := formatJSONError(err, taskJSON)
 		return c.HTML(http.StatusBadRequest, fmt.Sprintf(`
 			<div class="alert alert-error">
-				Invalid JSON format: %s
+				<strong>Invalid JSON:</strong> %s
 			</div>
-		`, err.Error()))
+		`, friendlyMsg))
 	}
 
 	// Validate request
