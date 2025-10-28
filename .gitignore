@@ -24,3 +24,4 @@ temp/
 coverage.out
 coverage.html
 graphservice
+data/
