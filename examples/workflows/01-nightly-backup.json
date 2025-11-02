@@ -1,0 +1,50 @@
+{
+  "@context": "https://schema.org",
+  "@type": "ScheduledAction",
+  "identifier": "nightly-graphdb-backup",
+  "name": "Nightly GraphDB Repository Backup",
+  "description": "Scheduled backup of production GraphDB repository to archive instance every night at 2 AM",
+  "additionalProperty": {
+    "url": "http://localhost:8080/v1/api/semantic/action",
+    "httpMethod": "POST",
+    "headers": {
+      "x-api-key": "${GRAPHDB_API_KEY}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "@context": "https://schema.org",
+      "@type": "TransferAction",
+      "identifier": "backup-prod-to-archive",
+      "name": "Transfer Production to Archive",
+      "description": "Full repository migration from production to backup server",
+      "fromLocation": {
+        "@type": "SoftwareSourceCode",
+        "identifier": "production",
+        "codeRepository": "http://prod-graphdb:7200/repositories/production",
+        "accessMode": "authenticated",
+        "additionalProperty": {
+          "serverUrl": "http://prod-graphdb:7200",
+          "username": "admin",
+          "password": "${PROD_PASSWORD}"
+        }
+      },
+      "toLocation": {
+        "@type": "SoftwareSourceCode",
+        "identifier": "archive",
+        "codeRepository": "http://backup-graphdb:7200/repositories/archive",
+        "accessMode": "authenticated",
+        "additionalProperty": {
+          "serverUrl": "http://backup-graphdb:7200",
+          "username": "admin",
+          "password": "${BACKUP_PASSWORD}"
+        }
+      }
+    }
+  },
+  "schedule": {
+    "@type": "Schedule",
+    "repeatFrequency": "P1D",
+    "startTime": "02:00:00",
+    "description": "Daily at 2:00 AM"
+  }
+}

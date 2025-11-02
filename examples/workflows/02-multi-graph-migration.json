@@ -1,0 +1,148 @@
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "identifier": "migrate-all-user-graphs",
+  "name": "Migrate All User Graphs",
+  "description": "Migrate multiple user-related graphs from source to target repository in parallel",
+  "parallel": true,
+  "concurrency": 3,
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "migrate-users-graph",
+        "name": "Migrate Users Graph",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "TransferAction",
+            "identifier": "transfer-users-graph",
+            "name": "Transfer Users Graph",
+            "fromLocation": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "source-repo",
+              "codeRepository": "http://source-graphdb:7200/repositories/source-repo",
+              "additionalProperty": {
+                "serverUrl": "http://source-graphdb:7200",
+                "username": "admin",
+                "password": "${SOURCE_PASSWORD}"
+              }
+            },
+            "object": {
+              "@type": "Dataset",
+              "identifier": "http://example.org/graph/users",
+              "name": "Users Graph",
+              "encodingFormat": "application/rdf+xml"
+            },
+            "toLocation": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "target-repo",
+              "codeRepository": "http://target-graphdb:7200/repositories/target-repo",
+              "additionalProperty": {
+                "serverUrl": "http://target-graphdb:7200",
+                "username": "admin",
+                "password": "${TARGET_PASSWORD}"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "migrate-products-graph",
+        "name": "Migrate Products Graph",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "TransferAction",
+            "identifier": "transfer-products-graph",
+            "object": {
+              "@type": "Dataset",
+              "identifier": "http://example.org/graph/products"
+            },
+            "fromLocation": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "source-repo",
+              "additionalProperty": {
+                "serverUrl": "http://source-graphdb:7200",
+                "username": "admin",
+                "password": "${SOURCE_PASSWORD}"
+              }
+            },
+            "toLocation": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "target-repo",
+              "additionalProperty": {
+                "serverUrl": "http://target-graphdb:7200",
+                "username": "admin",
+                "password": "${TARGET_PASSWORD}"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "migrate-orders-graph",
+        "name": "Migrate Orders Graph",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "TransferAction",
+            "identifier": "transfer-orders-graph",
+            "object": {
+              "@type": "Dataset",
+              "identifier": "http://example.org/graph/orders"
+            },
+            "fromLocation": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "source-repo",
+              "additionalProperty": {
+                "serverUrl": "http://source-graphdb:7200",
+                "username": "admin",
+                "password": "${SOURCE_PASSWORD}"
+              }
+            },
+            "toLocation": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "target-repo",
+              "additionalProperty": {
+                "serverUrl": "http://target-graphdb:7200",
+                "username": "admin",
+                "password": "${TARGET_PASSWORD}"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
