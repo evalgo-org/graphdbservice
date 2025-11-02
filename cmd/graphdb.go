@@ -1950,6 +1950,7 @@ var graphdbCmd = &cobra.Command{
 
 		// API routes (require API key)
 		e.POST("/v1/api/action", migrationHandler, apiKeyMiddleware)
+		e.POST("/v1/api/semantic/action", handleSemanticAction, apiKeyMiddleware) // Semantic JSON-LD endpoint
 
 		// Public routes (no authentication required)
 		e.GET("/health", func(c echo.Context) error {
