@@ -58,10 +58,12 @@
 package cmd
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -87,7 +89,88 @@ var (
 	// identityFile holds the path to the Ziti identity JSON file for zero-trust networking.
 	// When provided, all GraphDB connections will use Ziti secure networking.
 	identityFile string = ""
+
+	// debugMode controls whether detailed debug logging is enabled
+	debugMode bool = false
 )
+
+// debugLog logs a message only if debug mode is enabled
+func debugLog(format string, args ...interface{}) {
+	if debugMode {
+		fmt.Printf("DEBUG: "+format+"\n", args...)
+	}
+}
+
+// debugLogHTTP logs HTTP-related debug messages only if debug mode is enabled
+func debugLogHTTP(format string, args ...interface{}) {
+	if debugMode {
+		fmt.Printf("DEBUG HTTP: "+format+"\n", args...)
+	}
+}
+
+// normalizeURL removes trailing slashes from URLs to prevent double-slash issues
+// when constructing API endpoints
+func normalizeURL(url string) string {
+	return strings.TrimRight(url, "/")
+}
+
+// debugHTTPTransport wraps an http.RoundTripper to log request/response details
+type debugHTTPTransport struct {
+	Transport http.RoundTripper
+}
+
+// RoundTrip implements http.RoundTripper interface with debugging
+func (d *debugHTTPTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	debugLogHTTP("%s %s", req.Method, req.URL.String())
+
+	// Execute the request
+	resp, err := d.Transport.RoundTrip(req)
+	if err != nil {
+		debugLogHTTP("Request failed: %v", err)
+		return resp, err
+	}
+
+	// Log response status
+	debugLogHTTP("Response Status: %d %s", resp.StatusCode, resp.Status)
+
+	// If it's an error status, read and log the body
+	if resp.StatusCode >= 400 && debugMode {
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if readErr != nil {
+			debugLogHTTP("Failed to read error response body: %v", readErr)
+		} else {
+			debugLogHTTP("===== ERROR RESPONSE BODY (Status %d) =====", resp.StatusCode)
+			if debugMode {
+				fmt.Printf("%s\n", string(bodyBytes))
+			}
+			debugLogHTTP("===== END ERROR RESPONSE BODY =====")
+
+			// Restore the body for the caller
+			resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		}
+	}
+
+	return resp, err
+}
+
+// enableHTTPDebugLogging wraps the HTTP client with debug logging
+func enableHTTPDebugLogging(client *http.Client) *http.Client {
+	if client == nil {
+		client = &http.Client{}
+	}
+
+	if client.Transport == nil {
+		client.Transport = http.DefaultTransport
+	}
+
+	client.Transport = &debugHTTPTransport{
+		Transport: client.Transport,
+	}
+
+	return client
+}
 
 // MigrationRequest represents the root request structure for GraphDB operations.
 // It contains the API version and a list of tasks to be executed sequentially.
@@ -394,13 +477,13 @@ func migrationHandler(c echo.Context) error {
 	// Check if this is a multipart form request
 	contentType := c.Request().Header.Get("Content-Type")
 
-	fmt.Printf("DEBUG: Received request with Content-Type: %s\n", contentType)
+	debugLog("Received request with Content-Type: %s", contentType)
 
 	if contentType != "" && strings.HasPrefix(contentType, "multipart/form-data") {
-		fmt.Println("DEBUG: Routing to multipart handler")
+		debugLog("Routing to multipart handler")
 		return migrationHandlerMultipart(c)
 	} else {
-		fmt.Println("DEBUG: Routing to JSON handler")
+		debugLog("Routing to JSON handler")
 		return migrationHandlerJSON(c)
 	}
 }
@@ -600,7 +683,7 @@ func migrationHandlerJSON(c echo.Context) error {
 //   - error: 500 Internal Server Error if task processing fails
 //   - nil: On success, with JSON response containing task results
 func migrationHandlerMultipart(c echo.Context) error {
-	fmt.Println("DEBUG: Starting multipart form processing")
+	debugLog("Starting multipart form processing")
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -615,7 +698,7 @@ func migrationHandlerMultipart(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse multipart form: %v", err))
 	}
 
-	fmt.Println("DEBUG: Multipart form parsed successfully")
+	debugLog("Multipart form parsed successfully")
 
 	// Parse multipart form
 	form := c.Request().MultipartForm
@@ -625,12 +708,12 @@ func migrationHandlerMultipart(c echo.Context) error {
 	}
 	defer func() {
 		if form != nil {
-			fmt.Println("DEBUG: Cleaning up multipart form")
+			debugLog("Cleaning up multipart form")
 			_ = form.RemoveAll()
 		}
 	}()
 
-	fmt.Printf("DEBUG: Form has %d value fields and %d file fields\n", len(form.Value), len(form.File))
+	debugLog("Form has %d value fields and %d file fields", len(form.Value), len(form.File))
 
 	// Get JSON request from form field
 	jsonFields, exists := form.Value["request"]
@@ -639,7 +722,7 @@ func migrationHandlerMultipart(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "Missing 'request' field in form data")
 	}
 
-	fmt.Printf("DEBUG: Found request field with %d bytes\n", len(jsonFields[0]))
+	debugLog("Found request field with %d bytes", len(jsonFields[0]))
 
 	// Parse JSON request
 	var req MigrationRequest
@@ -648,7 +731,7 @@ func migrationHandlerMultipart(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid JSON in request field: "+err.Error())
 	}
 
-	fmt.Printf("DEBUG: Parsed JSON request with %d tasks\n", len(req.Tasks))
+	debugLog("Parsed JSON request with %d tasks", len(req.Tasks))
 
 	// Validate request
 	if req.Version == "" {
@@ -698,7 +781,7 @@ func migrationHandlerMultipart(c echo.Context) error {
 	results := make([]map[string]interface{}, len(req.Tasks))
 	hasError := false
 	for i, task := range req.Tasks {
-		fmt.Printf("DEBUG: Processing task %d: %s\n", i, task.Action)
+		debugLog("Processing task %d: %s", i, task.Action)
 
 		// Log task start
 		if session != nil {
@@ -783,7 +866,7 @@ func migrationHandlerMultipart(c echo.Context) error {
 			}
 
 			results[i] = result
-			fmt.Printf("DEBUG: Task %d completed successfully\n", i)
+			debugLog("Task %d completed successfully", i)
 		}()
 	}
 
@@ -800,7 +883,7 @@ func migrationHandlerMultipart(c echo.Context) error {
 		}
 	}
 
-	fmt.Println("DEBUG: All tasks processed, returning response")
+	debugLog("All tasks processed, returning response")
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"status":  "success",
@@ -974,7 +1057,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 	srcClient := http.DefaultClient
 	tgtClient := http.DefaultClient
 
-	fmt.Printf("DEBUG: Processing task action: %s\n", task.Action)
+	debugLog("Processing task action: %s", task.Action)
 
 	result := map[string]interface{}{
 		"action": task.Action,
@@ -1156,31 +1239,80 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		result["data_size"] = dataSize
 
 	case "repo-delete":
+		debugLog("repo-delete action started")
+		debugLog("Target URL: %s", task.Tgt.URL)
+		debugLog("Target Repo: %s", task.Tgt.Repo)
+		debugLog("Username: %s", task.Tgt.Username)
+
 		if identityFile != "" {
+			debugLog("Using Ziti identity file: %s", identityFile)
 			tgtURL, err := URL2ServiceRobust(task.Tgt.URL)
 			if err != nil {
+				debugLog("Failed to parse target URL: %v", err)
 				return nil, err
 			}
+			debugLog("Parsed Ziti service URL: %s", tgtURL)
 			tgtClient, err = db.GraphDBZitiClient(identityFile, tgtURL)
 			if err != nil {
+				debugLog("Failed to create Ziti client: %v", err)
 				return nil, err
 			}
+			debugLog("Ziti client created successfully")
 		}
+
+		// Enable HTTP debug logging to capture response bodies
+		tgtClient = enableHTTPDebugLogging(tgtClient)
 		db.HttpClient = tgtClient
+		debugLog("HTTP debug logging enabled")
+
+		debugLog("Fetching list of repositories...")
 		tgtGraphDB, err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
 		if err != nil {
-			return nil, err
+			debugLog("ERROR: Failed to fetch repositories: %v", err)
+			debugLog("Error type: %T", err)
+			return nil, fmt.Errorf("failed to fetch repositories from %s: %w", task.Tgt.URL, err)
 		}
-		for _, bind := range tgtGraphDB.Results.Bindings {
-			if bind.Id["value"] == task.Tgt.Repo {
+
+		debugLog("Found %d repositories", len(tgtGraphDB.Results.Bindings))
+
+		repoFound := false
+		for i, bind := range tgtGraphDB.Results.Bindings {
+			repoID := bind.Id["value"]
+			debugLog("Repository %d: %s", i, repoID)
+
+			if repoID == task.Tgt.Repo {
+				repoFound = true
+				debugLog("Found target repository: %s", task.Tgt.Repo)
+				debugLog("Attempting to delete repository...")
+				debugLog("DELETE URL: %s/repositories/%s", task.Tgt.URL, task.Tgt.Repo)
+
 				err := db.GraphDBDeleteRepository(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
 				if err != nil {
-					return nil, err
+					debugLog("ERROR: GraphDBDeleteRepository failed: %v", err)
+					debugLog("Error type: %T", err)
+					debugLog("Error string: %s", err.Error())
+
+					// Try to extract more details from the error
+					if strings.Contains(err.Error(), "400") {
+						debugLog("===== 400 Bad Request Error =====")
+						debugLog("Full error details: %+v", err)
+					}
+
+					return nil, fmt.Errorf("failed to delete repository %s: %w", task.Tgt.Repo, err)
 				}
+				debugLog("Repository %s deleted successfully", task.Tgt.Repo)
+				break
 			}
 		}
+
+		if !repoFound {
+			debugLog("WARNING: Repository %s not found in repository list", task.Tgt.Repo)
+			return nil, fmt.Errorf("repository %s not found on server %s", task.Tgt.Repo, task.Tgt.URL)
+		}
+
 		result["message"] = "Repository deleted successfully"
 		result["repo"] = task.Tgt.Repo
+		debugLog("repo-delete action completed successfully")
 
 	case "graph-delete":
 		if identityFile != "" {
@@ -1221,10 +1353,10 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 			}
 		}
 		db.HttpClient = tgtClient
-		fmt.Println("DEBUG: Starting repo-import processing")
+		debugLog("Starting repo-import processing")
 
 		// Check if target repository exists
-		fmt.Printf("DEBUG: Fetching repositories from %s\n", task.Tgt.URL)
+		debugLog("Fetching repositories from %s", task.Tgt.URL)
 		tgtGraphDB, err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
 		if err != nil {
 			return nil, err
@@ -1243,7 +1375,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 			return nil, fmt.Errorf("repository '%s' not found. Available repositories: %v", task.Tgt.Repo, getRepositoryNames(tgtGraphDB.Results.Bindings))
 		}
 
-		fmt.Printf("DEBUG: Repository '%s' found in GraphDB\n", task.Tgt.Repo)
+		debugLog("Repository '%s' found in GraphDB", task.Tgt.Repo)
 
 		// Get BRF data file from source repository (if specified) or use a local file
 		// This follows the same pattern as repo-migration
@@ -1272,7 +1404,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 				return nil, fmt.Errorf("source repository '%s' not found", task.Src.Repo)
 			}
 
-			fmt.Printf("DEBUG: Importing BRF data from %s to repository %s\n", task.Src.Repo, task.Tgt.Repo)
+			debugLog("Importing BRF data from %s to repository %s", task.Src.Repo, task.Tgt.Repo)
 			err = db.GraphDBRestoreBrf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, dataFile)
 			if err != nil {
 				return nil, err
@@ -1316,7 +1448,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 					_ = tempFile.Close()
 
 					// Import the BRF file
-					fmt.Printf("DEBUG: Importing BRF file %s to repository %s\n", fileHeader.Filename, task.Tgt.Repo)
+					debugLog("Importing BRF file %s to repository %s", fileHeader.Filename, task.Tgt.Repo)
 					err = db.GraphDBRestoreBrf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, tempFileName)
 					if err != nil {
 						return nil, fmt.Errorf("failed to import BRF file: %w", err)
@@ -1444,9 +1576,9 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 			}
 		}
 		db.HttpClient = tgtClient
-		fmt.Println("DEBUG: Starting graph-import processing")
+		debugLog("Starting graph-import processing")
 
-		fmt.Printf("DEBUG: Fetching repositories from %s\n", task.Tgt.URL)
+		debugLog("Fetching repositories from %s", task.Tgt.URL)
 		tgtGraphDB, err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
 		if err != nil {
 			return nil, err
@@ -1457,12 +1589,12 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 			return nil, fmt.Errorf("failed to get repositories from GraphDB at %s - nil response", task.Tgt.URL)
 		}
 
-		fmt.Printf("DEBUG: Found %d repositories in GraphDB\n", len(tgtGraphDB.Results.Bindings))
+		debugLog("Found %d repositories in GraphDB", len(tgtGraphDB.Results.Bindings))
 
 		// List all available repositories for debugging
 		if len(tgtGraphDB.Results.Bindings) == 0 {
 			fmt.Printf("WARNING: No repositories found in GraphDB at %s\n", task.Tgt.URL)
-			fmt.Printf("DEBUG: Attempting to create repository '%s' or continue assuming it exists\n", task.Tgt.Repo)
+			debugLog("Attempting to create repository '%s' or continue assuming it exists", task.Tgt.Repo)
 			// Continue with import attempt - the repository might exist but not be listed
 		} else {
 			fmt.Printf("DEBUG: Available repositories: ")
@@ -1491,13 +1623,13 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		// If we reach here, either the repo was found, or the repository list was empty
 		// In case of empty list, we'll attempt the import anyway
 		if foundRepo {
-			fmt.Printf("DEBUG: Repository '%s' found in GraphDB\n", task.Tgt.Repo)
+			debugLog("Repository '%s' found in GraphDB", task.Tgt.Repo)
 		} else {
-			fmt.Printf("DEBUG: Repository list was empty, attempting import to '%s' anyway\n", task.Tgt.Repo)
+			debugLog("Repository list was empty, attempting import to '%s' anyway", task.Tgt.Repo)
 		}
 
 		// Try to list graphs (this might fail if repository doesn't exist)
-		fmt.Printf("DEBUG: Listing graphs in repository: %s\n", task.Tgt.Repo)
+		debugLog("Listing graphs in repository: %s", task.Tgt.Repo)
 		fmt.Println("232", "fooooo", task.Tgt)
 		graphsResponse, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
 		fmt.Println("233", err)
@@ -1507,11 +1639,11 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		} else if graphsResponse.Results.Bindings == nil {
 			fmt.Printf("WARNING: GraphDB returned nil response for listing graphs\n")
 		} else {
-			fmt.Printf("DEBUG: Found %d graphs in repository\n", len(graphsResponse.Results.Bindings))
+			debugLog("Found %d graphs in repository", len(graphsResponse.Results.Bindings))
 			// Check if target graph exists and delete it if found
 			for _, bind := range graphsResponse.Results.Bindings {
 				if bind.ContextID.Value == task.Tgt.Graph {
-					fmt.Printf("DEBUG: Deleting existing graph: %s\n", task.Tgt.Graph)
+					debugLog("Deleting existing graph: %s", task.Tgt.Graph)
 					err := db.GraphDBDeleteGraph(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph)
 					if err != nil {
 						fmt.Printf("WARNING: Failed to delete existing graph: %v\n", err)
@@ -1525,16 +1657,16 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 		// Handle uploaded files for import
 		if files != nil {
 			fileKey := fmt.Sprintf("task_%d_files", taskIndex)
-			fmt.Printf("DEBUG: Looking for files with key: %s\n", fileKey)
+			debugLog("Looking for files with key: %s", fileKey)
 
 			if taskFiles, exists := files[fileKey]; exists {
-				fmt.Printf("DEBUG: Found %d files to import\n", len(taskFiles))
+				debugLog("Found %d files to import", len(taskFiles))
 				result["uploaded_files"] = len(taskFiles)
 				result["file_names"] = getFileNames(taskFiles)
 
 				// Process each uploaded file for import
 				for i, fileHeader := range taskFiles {
-					fmt.Printf("DEBUG: Processing file %d: %s (size: %d bytes)\n", i, fileHeader.Filename, fileHeader.Size)
+					debugLog("Processing file %d: %s (size: %d bytes)", i, fileHeader.Filename, fileHeader.Size)
 
 					func() {
 						defer func() {
@@ -1553,7 +1685,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 						// Save file temporarily with unique UUID-based filename to avoid conflicts
 						fileExt := filepath.Ext(fileHeader.Filename)
 						tempFileName := filepath.Join(os.TempDir(), fmt.Sprintf("graph_import_%s%s", uuid.New().String(), fileExt))
-						fmt.Printf("DEBUG: Creating temp file: %s\n", tempFileName)
+						debugLog("Creating temp file: %s", tempFileName)
 
 						tempFile, err := os.Create(tempFileName)
 						if err != nil {
@@ -1562,7 +1694,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 						}
 						defer func() { _ = tempFile.Close() }()
 						defer func() {
-							fmt.Printf("DEBUG: Removing temp file: %s\n", tempFileName)
+							debugLog("Removing temp file: %s", tempFileName)
 							_ = os.Remove(tempFileName)
 						}()
 
@@ -1572,7 +1704,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 							return
 						}
 
-						fmt.Printf("DEBUG: Copying file content to temp file\n")
+						debugLog("Copying file content to temp file")
 						bytesWritten, err := tempFile.ReadFrom(file)
 						if err != nil {
 							fmt.Printf("ERROR: Failed to copy file: %v\n", err)
@@ -1580,19 +1712,19 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 						}
 						_ = tempFile.Close()
 
-						fmt.Printf("DEBUG: Copied %d bytes to temp file\n", bytesWritten)
+						debugLog("Copied %d bytes to temp file", bytesWritten)
 
 						// Determine import method based on file extension
 						filename := strings.ToLower(fileHeader.Filename)
 
-						fmt.Printf("DEBUG: Importing text RDF file: %s\n", fileHeader.Filename)
+						debugLog("Importing text RDF file: %s", fileHeader.Filename)
 						err = db.GraphDBImportGraphRdf(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo, task.Tgt.Graph, tempFileName)
 						if err != nil {
 							fmt.Printf("ERROR: Failed to import RDF file %s: %v\n", fileHeader.Filename, err)
 							return
 						}
 
-						fmt.Printf("DEBUG: Successfully imported file: %s\n", fileHeader.Filename)
+						debugLog("Successfully imported file: %s", fileHeader.Filename)
 						result[fmt.Sprintf("file_%d_processed", i)] = fileHeader.Filename
 						result[fmt.Sprintf("file_%d_type", i)] = getFileType(filename)
 					}()
@@ -1906,6 +2038,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 func init() {
 	rootCmd.AddCommand(graphdbCmd)
 	graphdbCmd.Flags().String("identity", "", "identity to authenticate to an ziti network")
+	graphdbCmd.Flags().Bool("debug", false, "enable detailed debug logging for troubleshooting")
 }
 
 var graphdbCmd = &cobra.Command{
@@ -1914,6 +2047,11 @@ var graphdbCmd = &cobra.Command{
 	Long:  `service to integrate with graphdb`,
 	Run: func(cmd *cobra.Command, args []string) {
 		identityFile, _ = cmd.Flags().GetString("identity")
+		debugMode, _ = cmd.Flags().GetBool("debug")
+
+		if debugMode {
+			fmt.Println("DEBUG mode enabled - detailed logging active")
+		}
 
 		// Initialize authentication system
 		if err := InitializeAuth(); err != nil {

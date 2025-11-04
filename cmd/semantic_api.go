@@ -138,11 +138,13 @@ func executeRepositoryMigration(c echo.Context, action *semantic.TransferAction)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid source credentials: %v", err))
 	}
+	srcURL = normalizeURL(srcURL) // Remove trailing slash
 
 	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(tgtRepo)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid target credentials: %v", err))
 	}
+	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
 
 	// Create legacy Task for execution
 	task := Task{
@@ -202,11 +204,13 @@ func executeGraphMigration(c echo.Context, action *semantic.TransferAction) erro
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid source credentials: %v", err))
 	}
+	srcURL = normalizeURL(srcURL) // Remove trailing slash
 
 	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(tgtRepo)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid target credentials: %v", err))
 	}
+	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
 
 	graphURI := semantic.ExtractGraphIdentifier(graph)
 
@@ -262,6 +266,7 @@ func executeSemanticCreateAction(c echo.Context, jsonData []byte) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid credentials: %v", err))
 	}
+	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
 
 	// Create legacy Task for execution
 	task := Task{
@@ -305,6 +310,7 @@ func executeSemanticDeleteAction(c echo.Context, jsonData []byte) error {
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid credentials: %v", err))
 		}
+	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
 
 		task := Task{
 			Action: "repo-delete",
@@ -393,6 +399,7 @@ func executeSemanticUpdateAction(c echo.Context, jsonData []byte) error {
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid credentials: %v", err))
 		}
+	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
 
 		task := Task{
 			Action: "repo-rename",
@@ -505,6 +512,7 @@ func executeSemanticUploadAction(c echo.Context, jsonData []byte) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid target credentials: %v", err))
 	}
+	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
 
 	// Check if it's graph import or repo import
 	graph, graphErr := extractGraph(action.Object)
@@ -562,11 +570,723 @@ func executeSemanticUploadAction(c echo.Context, jsonData []byte) error {
 	})
 }
 
+// ItemListWorkflow represents a Schema.org ItemList for workflow execution
+type ItemListWorkflow struct {
+	Context         interface{}    `json:"@context"`
+	Type            string         `json:"@type"`
+	Identifier      string         `json:"identifier"`
+	Name            string         `json:"name"`
+	Description     string         `json:"description"`
+	Parallel        bool           `json:"parallel"`
+	Concurrency     int            `json:"concurrency"`
+	ItemListElement []ListItemNode `json:"itemListElement"`
+}
+
+// ListItemNode represents a ListItem in the ItemList
+type ListItemNode struct {
+	Type     string                 `json:"@type"`
+	Position int                    `json:"position"`
+	Item     map[string]interface{} `json:"item"`
+}
+
 // executeSemanticItemList handles ItemList (workflow with multiple actions)
 func executeSemanticItemList(c echo.Context, jsonData []byte) error {
-	// TODO: Implement workflow execution
-	// This would execute multiple actions in sequence or parallel
-	return echo.NewHTTPError(http.StatusNotImplemented, "ItemList workflows not yet implemented")
+	debugLog("executeSemanticItemList called")
+
+	var workflow ItemListWorkflow
+	if err := json.Unmarshal(jsonData, &workflow); err != nil {
+		debugLog("Failed to unmarshal ItemList: %v\n", err)
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse ItemList: %v", err))
+	}
+
+	debugLog("Parsed ItemList: %s with %d items\n", workflow.Identifier, len(workflow.ItemListElement))
+	debugLog("Parallel=%v, Concurrency=%d\n", workflow.Parallel, workflow.Concurrency)
+
+	if len(workflow.ItemListElement) == 0 {
+		debugLog("ItemList has no items")
+		return echo.NewHTTPError(http.StatusBadRequest, "ItemList must contain at least one item")
+	}
+
+	// Set default concurrency if not specified
+	if workflow.Concurrency <= 0 {
+		workflow.Concurrency = 1
+		debugLog("Set default concurrency to 1")
+	}
+
+	var results []map[string]interface{}
+	var errors []string
+
+	if workflow.Parallel {
+		// Execute actions in parallel with concurrency limit
+		debugLog("Executing %d actions in PARALLEL (concurrency: %d)\n", len(workflow.ItemListElement), workflow.Concurrency)
+		results, errors = executeActionsParallel(c, workflow.ItemListElement, workflow.Concurrency)
+	} else {
+		// Execute actions sequentially
+		debugLog("Executing %d actions SEQUENTIALLY\n", len(workflow.ItemListElement))
+		results, errors = executeActionsSequential(c, workflow.ItemListElement)
+	}
+
+	debugLog("Execution complete. Success: %d, Failed: %d\n", len(results)-len(errors), len(errors))
+
+	// Build response
+	response := map[string]interface{}{
+		"@context":       "https://schema.org",
+		"@type":          "ItemList",
+		"identifier":     workflow.Identifier,
+		"actionStatus":   "CompletedActionStatus",
+		"totalItems":     len(workflow.ItemListElement),
+		"successfulItems": len(results) - len(errors),
+		"failedItems":    len(errors),
+		"results":        results,
+	}
+
+	if len(errors) > 0 {
+		response["errors"] = errors
+		response["actionStatus"] = "FailedActionStatus"
+	}
+
+	statusCode := http.StatusOK
+	if len(errors) == len(workflow.ItemListElement) {
+		// All actions failed
+		statusCode = http.StatusInternalServerError
+	} else if len(errors) > 0 {
+		// Some actions failed
+		statusCode = http.StatusMultiStatus
+	}
+
+	return c.JSON(statusCode, response)
+}
+
+// executeActionsSequential executes actions one by one in order
+func executeActionsSequential(c echo.Context, items []ListItemNode) ([]map[string]interface{}, []string) {
+	results := make([]map[string]interface{}, len(items))
+	var errors []string
+
+	for i, listItem := range items {
+		result, err := executeWorkflowItem(c, listItem, i)
+		if err != nil {
+			errorMsg := fmt.Sprintf("Item %d (position %d): %v", i, listItem.Position, err)
+			errors = append(errors, errorMsg)
+			results[i] = map[string]interface{}{
+				"position": listItem.Position,
+				"status":   "failed",
+				"error":    err.Error(),
+			}
+		} else {
+			results[i] = result
+		}
+	}
+
+	return results, errors
+}
+
+// executeActionsParallel executes actions in parallel with concurrency control
+func executeActionsParallel(c echo.Context, items []ListItemNode, concurrency int) ([]map[string]interface{}, []string) {
+	results := make([]map[string]interface{}, len(items))
+	var errors []string
+
+	// Create a semaphore to limit concurrency
+	sem := make(chan struct{}, concurrency)
+
+	// Channel to collect results
+	type resultPair struct {
+		index  int
+		result map[string]interface{}
+		err    error
+	}
+	resultChan := make(chan resultPair, len(items))
+
+	// Launch goroutines for each item
+	for i, listItem := range items {
+		go func(idx int, item ListItemNode) {
+			// Acquire semaphore
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			result, err := executeWorkflowItem(c, item, idx)
+			resultChan <- resultPair{
+				index:  idx,
+				result: result,
+				err:    err,
+			}
+		}(i, listItem)
+	}
+
+	// Collect results
+	for i := 0; i < len(items); i++ {
+		pair := <-resultChan
+		if pair.err != nil {
+			errorMsg := fmt.Sprintf("Item %d (position %d): %v", pair.index, items[pair.index].Position, pair.err)
+			errors = append(errors, errorMsg)
+			results[pair.index] = map[string]interface{}{
+				"position": items[pair.index].Position,
+				"status":   "failed",
+				"error":    pair.err.Error(),
+			}
+		} else {
+			results[pair.index] = pair.result
+		}
+	}
+
+	return results, errors
+}
+
+// executeWorkflowItem executes a single workflow item (typically a ScheduledAction)
+func executeWorkflowItem(c echo.Context, listItem ListItemNode, index int) (map[string]interface{}, error) {
+	debugLog("executeWorkflowItem called for index %d, position %d\n", index, listItem.Position)
+
+	// Extract the item (which should be a ScheduledAction or direct action)
+	itemJSON, err := json.Marshal(listItem.Item)
+	if err != nil {
+		debugLog("Failed to marshal item: %v\n", err)
+		return nil, fmt.Errorf("failed to marshal item: %w", err)
+	}
+
+	// Check the @type of the item
+	itemType, ok := listItem.Item["@type"].(string)
+	if !ok {
+		debugLog("Item missing @type field")
+		return nil, fmt.Errorf("item missing @type field")
+	}
+
+	debugLog("Item @type: %s\n", itemType)
+
+	// Create a temporary response recorder to capture the action result
+	// since handleJSONLDAction writes directly to the response
+	var actionResult map[string]interface{}
+
+	// For ScheduledAction, extract the body and execute it
+	if itemType == "ScheduledAction" {
+		debugLog("Handling ScheduledAction - extracting body")
+
+		// Extract additionalProperty.body
+		props, ok := listItem.Item["additionalProperty"].(map[string]interface{})
+		if !ok {
+			debugLog("ScheduledAction missing additionalProperty")
+			return nil, fmt.Errorf("ScheduledAction missing additionalProperty")
+		}
+
+		body, ok := props["body"]
+		if !ok {
+			debugLog("ScheduledAction missing body in additionalProperty")
+			return nil, fmt.Errorf("ScheduledAction missing body in additionalProperty")
+		}
+
+		// Execute the inner action
+		bodyJSON, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal body: %w", err)
+		}
+
+		var innerAction map[string]interface{}
+		if err := json.Unmarshal(bodyJSON, &innerAction); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal inner action: %w", err)
+		}
+
+		// Execute based on action type
+		actionType, ok := innerAction["@type"].(string)
+		if !ok {
+			debugLog("Inner action missing @type")
+			return nil, fmt.Errorf("inner action missing @type")
+		}
+
+		debugLog("Executing inner action: %s\n", actionType)
+
+		// Execute the action and capture result
+		actionResult, err = executeActionDirect(c, actionType, bodyJSON)
+		if err != nil {
+			debugLog("Action execution failed: %v\n", err)
+			return nil, err
+		}
+
+		debugLog("Action executed successfully: %s\n", actionType)
+
+		// Add item metadata to result
+		actionResult["position"] = listItem.Position
+		actionResult["itemIndex"] = index
+		if name, ok := listItem.Item["name"].(string); ok {
+			actionResult["itemName"] = name
+		}
+		if id, ok := listItem.Item["identifier"].(string); ok {
+			actionResult["itemIdentifier"] = id
+		}
+
+		return actionResult, nil
+	}
+
+	// Direct action (not wrapped in ScheduledAction)
+	actionResult, err = executeActionDirect(c, itemType, itemJSON)
+	if err != nil {
+		return nil, err
+	}
+
+	actionResult["position"] = listItem.Position
+	actionResult["itemIndex"] = index
+
+	return actionResult, nil
+}
+
+// executeActionDirect executes an action directly and returns the result
+func executeActionDirect(c echo.Context, actionType string, jsonData []byte) (map[string]interface{}, error) {
+	switch actionType {
+	case "TransferAction":
+		return executeTransferActionDirect(jsonData)
+	case "DeleteAction":
+		return executeDeleteActionDirect(jsonData)
+	case "CreateAction":
+		return executeCreateActionDirect(jsonData)
+	case "UpdateAction":
+		return executeUpdateActionDirect(jsonData)
+	case "UploadAction":
+		return executeUploadActionDirect(jsonData)
+	default:
+		return nil, fmt.Errorf("unsupported action type: %s", actionType)
+	}
+}
+
+// executeDeleteActionDirect executes a DeleteAction and returns the result directly
+func executeDeleteActionDirect(jsonData []byte) (map[string]interface{}, error) {
+	debugLog("executeDeleteActionDirect called")
+
+	var action semantic.DeleteAction
+	if err := json.Unmarshal(jsonData, &action); err != nil {
+		debugLog("Failed to unmarshal DeleteAction: %v\n", err)
+		return nil, fmt.Errorf("failed to parse DeleteAction: %w", err)
+	}
+
+	debugLog("DeleteAction identifier: %s\n", action.Identifier)
+
+	// Try to parse as repository first
+	repo, repoErr := extractRepository(action.Object)
+	if repoErr == nil {
+		// Repository deletion
+		debugLog("Detected repository deletion")
+		tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(repo)
+		if err != nil {
+			debugLog("Failed to extract credentials: %v\n", err)
+			return nil, fmt.Errorf("invalid credentials: %w", err)
+		}
+		tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+
+		debugLog("Deleting repository: %s at %s\n", tgtRepoName, tgtURL)
+
+		task := Task{
+			Action: "repo-delete",
+			Tgt: &Repository{
+				URL:      tgtURL,
+				Username: tgtUser,
+				Password: tgtPass,
+				Repo:     tgtRepoName,
+			},
+		}
+
+		debugLog("Calling processTask for repo-delete")
+		result, err := processTask(task, nil, 0)
+		if err != nil {
+			debugLog("processTask failed: %v\n", err)
+			return nil, fmt.Errorf("deletion failed: %w", err)
+		}
+
+		debugLog("Repository deletion successful: %v\n", result)
+
+		return map[string]interface{}{
+			"@context":     "https://schema.org",
+			"@type":        "DeleteAction",
+			"identifier":   action.Identifier,
+			"actionStatus": "CompletedActionStatus",
+			"result":       result,
+		}, nil
+	}
+
+	// Try to parse as graph
+	graph, graphErr := extractGraph(action.Object)
+	if graphErr == nil {
+		// Graph deletion
+		if graph.IncludedInDataCatalog == nil {
+			return nil, fmt.Errorf("graph must include includedInDataCatalog")
+		}
+
+		graphURI := semantic.ExtractGraphIdentifier(graph)
+		repoURL := graph.IncludedInDataCatalog.URL
+		repoName := graph.IncludedInDataCatalog.Identifier
+
+		props := graph.IncludedInDataCatalog.Properties
+		if props == nil {
+			return nil, fmt.Errorf("missing credentials in includedInDataCatalog")
+		}
+
+		username, _ := props["username"].(string)
+		password, _ := props["password"].(string)
+
+		task := Task{
+			Action: "graph-delete",
+			Tgt: &Repository{
+				URL:      repoURL,
+				Username: username,
+				Password: password,
+				Repo:     repoName,
+				Graph:    graphURI,
+			},
+		}
+
+		result, err := processTask(task, nil, 0)
+		if err != nil {
+			return nil, fmt.Errorf("graph deletion failed: %w", err)
+		}
+
+		return map[string]interface{}{
+			"@context":     "https://schema.org",
+			"@type":        "DeleteAction",
+			"identifier":   action.Identifier,
+			"actionStatus": "CompletedActionStatus",
+			"result":       result,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("invalid object: must be repository or graph")
+}
+
+// executeTransferActionDirect executes a TransferAction and returns the result directly
+func executeTransferActionDirect(jsonData []byte) (map[string]interface{}, error) {
+	var action semantic.TransferAction
+	if err := json.Unmarshal(jsonData, &action); err != nil {
+		return nil, fmt.Errorf("failed to parse TransferAction: %w", err)
+	}
+
+	if action.Object != nil {
+		// Graph migration
+		srcRepo, err := extractRepository(action.FromLocation)
+		if err != nil {
+			return nil, fmt.Errorf("invalid fromLocation: %w", err)
+		}
+
+		tgtRepo, err := extractRepository(action.ToLocation)
+		if err != nil {
+			return nil, fmt.Errorf("invalid toLocation: %w", err)
+		}
+
+		graph, err := extractGraph(action.Object)
+		if err != nil {
+			return nil, fmt.Errorf("invalid object (graph): %w", err)
+		}
+
+		srcURL, srcUser, srcPass, srcRepoName, err := semantic.ExtractRepositoryCredentials(srcRepo)
+		if err != nil {
+			return nil, fmt.Errorf("invalid source credentials: %w", err)
+		}
+	srcURL = normalizeURL(srcURL) // Remove trailing slash
+
+		tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(tgtRepo)
+		if err != nil {
+			return nil, fmt.Errorf("invalid target credentials: %w", err)
+		}
+	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+
+		graphURI := semantic.ExtractGraphIdentifier(graph)
+
+		task := Task{
+			Action: "graph-migration",
+			Src: &Repository{
+				URL:      srcURL,
+				Username: srcUser,
+				Password: srcPass,
+				Repo:     srcRepoName,
+				Graph:    graphURI,
+			},
+			Tgt: &Repository{
+				URL:      tgtURL,
+				Username: tgtUser,
+				Password: tgtPass,
+				Repo:     tgtRepoName,
+				Graph:    graphURI,
+			},
+		}
+
+		result, err := processTask(task, nil, 0)
+		if err != nil {
+			return nil, fmt.Errorf("graph migration failed: %w", err)
+		}
+
+		return map[string]interface{}{
+			"@context":     "https://schema.org",
+			"@type":        "TransferAction",
+			"identifier":   action.Identifier,
+			"actionStatus": "CompletedActionStatus",
+			"result":       result,
+		}, nil
+	}
+
+	// Repository migration
+	srcRepo, err := extractRepository(action.FromLocation)
+	if err != nil {
+		return nil, fmt.Errorf("invalid fromLocation: %w", err)
+	}
+
+	tgtRepo, err := extractRepository(action.ToLocation)
+	if err != nil {
+		return nil, fmt.Errorf("invalid toLocation: %w", err)
+	}
+
+	srcURL, srcUser, srcPass, srcRepoName, err := semantic.ExtractRepositoryCredentials(srcRepo)
+	if err != nil {
+		return nil, fmt.Errorf("invalid source credentials: %w", err)
+	}
+	srcURL = normalizeURL(srcURL) // Remove trailing slash
+
+	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(tgtRepo)
+	if err != nil {
+		return nil, fmt.Errorf("invalid target credentials: %w", err)
+	}
+	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+
+	task := Task{
+		Action: "repo-migration",
+		Src: &Repository{
+			URL:      srcURL,
+			Username: srcUser,
+			Password: srcPass,
+			Repo:     srcRepoName,
+		},
+		Tgt: &Repository{
+			URL:      tgtURL,
+			Username: tgtUser,
+			Password: tgtPass,
+			Repo:     tgtRepoName,
+		},
+	}
+
+	result, err := processTask(task, nil, 0)
+	if err != nil {
+		return nil, fmt.Errorf("migration failed: %w", err)
+	}
+
+	return map[string]interface{}{
+		"@context":     "https://schema.org",
+		"@type":        "TransferAction",
+		"identifier":   action.Identifier,
+		"actionStatus": "CompletedActionStatus",
+		"result":       result,
+	}, nil
+}
+
+// executeCreateActionDirect executes a CreateAction and returns the result directly
+func executeCreateActionDirect(jsonData []byte) (map[string]interface{}, error) {
+	var action semantic.CreateAction
+	if err := json.Unmarshal(jsonData, &action); err != nil {
+		return nil, fmt.Errorf("failed to parse CreateAction: %w", err)
+	}
+
+	repo, err := extractRepository(action.Result)
+	if err != nil {
+		return nil, fmt.Errorf("invalid result: %w", err)
+	}
+
+	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(repo)
+	if err != nil {
+		return nil, fmt.Errorf("invalid credentials: %w", err)
+	}
+	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+
+	task := Task{
+		Action: "repo-create",
+		Tgt: &Repository{
+			URL:      tgtURL,
+			Username: tgtUser,
+			Password: tgtPass,
+			Repo:     tgtRepoName,
+		},
+	}
+
+	result, err := processTask(task, nil, 0)
+	if err != nil {
+		return nil, fmt.Errorf("creation failed: %w", err)
+	}
+
+	return map[string]interface{}{
+		"@context":     "https://schema.org",
+		"@type":        "CreateAction",
+		"identifier":   action.Identifier,
+		"actionStatus": "CompletedActionStatus",
+		"result":       result,
+	}, nil
+}
+
+// executeUpdateActionDirect executes an UpdateAction and returns the result directly
+func executeUpdateActionDirect(jsonData []byte) (map[string]interface{}, error) {
+	var action semantic.UpdateAction
+	if err := json.Unmarshal(jsonData, &action); err != nil {
+		return nil, fmt.Errorf("failed to parse UpdateAction: %w", err)
+	}
+
+	repo, repoErr := extractRepository(action.Object)
+	if repoErr == nil {
+		tgtURL, tgtUser, tgtPass, oldRepoName, err := semantic.ExtractRepositoryCredentials(repo)
+		if err != nil {
+			return nil, fmt.Errorf("invalid credentials: %w", err)
+		}
+	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+
+		task := Task{
+			Action: "repo-rename",
+			Tgt: &Repository{
+				URL:      tgtURL,
+				Username: tgtUser,
+				Password: tgtPass,
+				RepoOld:  oldRepoName,
+				RepoNew:  action.TargetName,
+			},
+		}
+
+		result, err := processTask(task, nil, 0)
+		if err != nil {
+			return nil, fmt.Errorf("rename failed: %w", err)
+		}
+
+		return map[string]interface{}{
+			"@context":     "https://schema.org",
+			"@type":        "UpdateAction",
+			"identifier":   action.Identifier,
+			"actionStatus": "CompletedActionStatus",
+			"result":       result,
+		}, nil
+	}
+
+	graph, graphErr := extractGraph(action.Object)
+	if graphErr == nil {
+		if graph.IncludedInDataCatalog == nil {
+			return nil, fmt.Errorf("graph must include includedInDataCatalog")
+		}
+
+		oldGraphURI := semantic.ExtractGraphIdentifier(graph)
+		repoURL := graph.IncludedInDataCatalog.URL
+		repoName := graph.IncludedInDataCatalog.Identifier
+
+		props := graph.IncludedInDataCatalog.Properties
+		if props == nil {
+			return nil, fmt.Errorf("missing credentials in includedInDataCatalog")
+		}
+
+		username, _ := props["username"].(string)
+		password, _ := props["password"].(string)
+
+		task := Task{
+			Action: "graph-rename",
+			Tgt: &Repository{
+				URL:      repoURL,
+				Username: username,
+				Password: password,
+				Repo:     repoName,
+				GraphOld: oldGraphURI,
+				GraphNew: action.TargetName,
+			},
+		}
+
+		result, err := processTask(task, nil, 0)
+		if err != nil {
+			return nil, fmt.Errorf("graph rename failed: %w", err)
+		}
+
+		return map[string]interface{}{
+			"@context":     "https://schema.org",
+			"@type":        "UpdateAction",
+			"identifier":   action.Identifier,
+			"actionStatus": "CompletedActionStatus",
+			"result":       result,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("invalid object: must be repository or graph")
+}
+
+// executeUploadActionDirect executes an UploadAction and returns the result directly
+func executeUploadActionDirect(jsonData []byte) (map[string]interface{}, error) {
+	var action semantic.UploadAction
+	if err := json.Unmarshal(jsonData, &action); err != nil {
+		return nil, fmt.Errorf("failed to parse UploadAction: %w", err)
+	}
+
+	targetRepo, err := extractRepository(action.Target)
+	if err != nil {
+		if catalog, ok := action.Target.(*semantic.DataCatalog); ok {
+			props := catalog.Properties
+			if props == nil {
+				return nil, fmt.Errorf("missing credentials in target")
+			}
+
+			username, _ := props["username"].(string)
+			password, _ := props["password"].(string)
+			serverURL, _ := props["serverUrl"].(string)
+
+			targetRepo = &semantic.GraphDBRepository{
+				Identifier: catalog.Identifier,
+				Properties: map[string]interface{}{
+					"serverUrl": serverURL,
+					"username":  username,
+					"password":  password,
+				},
+			}
+		} else {
+			return nil, fmt.Errorf("invalid target: %w", err)
+		}
+	}
+
+	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(targetRepo)
+	if err != nil {
+		return nil, fmt.Errorf("invalid target credentials: %w", err)
+	}
+	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+
+	graph, graphErr := extractGraph(action.Object)
+	if graphErr == nil {
+		graphURI := semantic.ExtractGraphIdentifier(graph)
+
+		task := Task{
+			Action: "graph-import",
+			Tgt: &Repository{
+				URL:      tgtURL,
+				Username: tgtUser,
+				Password: tgtPass,
+				Repo:     tgtRepoName,
+				Graph:    graphURI,
+			},
+		}
+
+		result, err := processTask(task, nil, 0)
+		if err != nil {
+			return nil, fmt.Errorf("graph import failed: %w", err)
+		}
+
+		return map[string]interface{}{
+			"@context":     "https://schema.org",
+			"@type":        "UploadAction",
+			"identifier":   action.Identifier,
+			"actionStatus": "CompletedActionStatus",
+			"result":       result,
+		}, nil
+	}
+
+	task := Task{
+		Action: "repo-import",
+		Tgt: &Repository{
+			URL:      tgtURL,
+			Username: tgtUser,
+			Password: tgtPass,
+			Repo:     tgtRepoName,
+		},
+	}
+
+	result, err := processTask(task, nil, 0)
+	if err != nil {
+		return nil, fmt.Errorf("repository import failed: %w", err)
+	}
+
+	return map[string]interface{}{
+		"@context":     "https://schema.org",
+		"@type":        "UploadAction",
+		"identifier":   action.Identifier,
+		"actionStatus": "CompletedActionStatus",
+		"result":       result,
+	}, nil
 }
 
 // handleScheduledAction extracts the inner action from a ScheduledAction wrapper

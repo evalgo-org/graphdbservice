@@ -145,7 +145,30 @@ func uiExecuteHandler(c echo.Context) error {
 		`)
 	}
 
-	// Parse the migration request
+	// Check if it's JSON-LD format (has @context or @type)
+	var rawJSON map[string]interface{}
+	if err := json.Unmarshal([]byte(taskJSON), &rawJSON); err != nil {
+		// Generate user-friendly error message
+		friendlyMsg := formatJSONError(err, taskJSON)
+		// Return 200 for HTMX to swap the content (validation errors are expected)
+		return c.HTML(http.StatusOK, fmt.Sprintf(`
+			<div class="alert alert-error">
+				<strong>Invalid JSON:</strong> %s
+			</div>
+		`, friendlyMsg))
+	}
+
+	// Check if it's a JSON-LD/Semantic workflow
+	if _, hasContext := rawJSON["@context"]; hasContext {
+		return uiExecuteSemanticWorkflow(c, taskJSON, rawJSON)
+	}
+	if actionType, hasType := rawJSON["@type"]; hasType {
+		if typeStr, ok := actionType.(string); ok && isSemanticActionType(typeStr) {
+			return uiExecuteSemanticWorkflow(c, taskJSON, rawJSON)
+		}
+	}
+
+	// Parse as legacy migration request
 	var req MigrationRequest
 	if err := json.Unmarshal([]byte(taskJSON), &req); err != nil {
 		// Generate user-friendly error message
@@ -163,7 +186,7 @@ func uiExecuteHandler(c echo.Context) error {
 		// Return 200 for HTMX to swap the content (validation errors are expected)
 		return c.HTML(http.StatusOK, `
 			<div class="alert alert-error">
-				<strong>Error:</strong> Version is required
+				<strong>Error:</strong> Version is required (or use JSON-LD format with @context)
 			</div>
 		`)
 	}
@@ -232,9 +255,172 @@ func uiExecuteHandler(c echo.Context) error {
 	return component.Render(c.Request().Context(), c.Response().Writer)
 }
 
+// uiExecuteSemanticWorkflow processes JSON-LD/Semantic workflow requests from the UI
+func uiExecuteSemanticWorkflow(c echo.Context, taskJSON string, rawJSON map[string]interface{}) error {
+	// Get the @type to determine workflow type
+	actionType, _ := rawJSON["@type"].(string)
+	debugLog("Detected semantic workflow with @type: %s\n", actionType)
+
+	// Handle ItemList workflows
+	if actionType == "ItemList" {
+		debugLog("Routing to ItemList workflow handler")
+		return uiExecuteItemListWorkflow(c, taskJSON, rawJSON)
+	}
+
+	// Handle single semantic actions (TransferAction, DeleteAction, etc.)
+	debugLog("Routing to single semantic action handler: %s\n", actionType)
+	return uiExecuteSingleSemanticAction(c, taskJSON, rawJSON, actionType)
+}
+
+// uiExecuteItemListWorkflow processes ItemList workflows with multiple actions
+func uiExecuteItemListWorkflow(c echo.Context, taskJSON string, rawJSON map[string]interface{}) error {
+	debugLog("Starting ItemList workflow parsing")
+
+	// Parse as ItemList
+	var workflow ItemListWorkflow
+	if err := json.Unmarshal([]byte(taskJSON), &workflow); err != nil {
+		debugLog("Failed to parse ItemList workflow: %v\n", err)
+		return c.HTML(http.StatusOK, fmt.Sprintf(`
+			<div class="alert alert-error">
+				<strong>Invalid Workflow:</strong> %s
+			</div>
+		`, err.Error()))
+	}
+
+	debugLog("Parsed ItemList workflow: %s (identifier: %s)\n", workflow.Name, workflow.Identifier)
+	fmt.Printf("DEBUG: Workflow has %d items, parallel=%v, concurrency=%d\n",
+		len(workflow.ItemListElement), workflow.Parallel, workflow.Concurrency)
+
+	if len(workflow.ItemListElement) == 0 {
+		debugLog("ItemList has no items")
+		return c.HTML(http.StatusOK, `
+			<div class="alert alert-error">
+				<strong>Error:</strong> ItemList must contain at least one item
+			</div>
+		`)
+	}
+
+	// Get user context
+	userID, username, _, authenticated := GetCurrentUser(c)
+	if !authenticated {
+		userID = "anonymous"
+		username = "anonymous"
+	}
+
+	// Create session
+	sessionID := uuid.New().String()
+	session := &TaskSession{
+		ID:        sessionID,
+		Tasks:     make([]templates.TaskStatus, len(workflow.ItemListElement)),
+		Clients:   make(map[chan templates.TaskStatus]bool),
+		StartTime: time.Now(),
+		UserID:    userID,
+		Username:  username,
+		IPAddress: c.RealIP(),
+		UserAgent: c.Request().UserAgent(),
+	}
+
+	// Initialize task statuses from workflow items
+	for i, listItem := range workflow.ItemListElement {
+		// Extract action type from the item
+		itemType := "unknown"
+
+		if scheduledAction, ok := listItem.Item["@type"].(string); ok && scheduledAction == "ScheduledAction" {
+			// Extract inner action type from body
+			if props, ok := listItem.Item["additionalProperty"].(map[string]interface{}); ok {
+				if body, ok := props["body"].(map[string]interface{}); ok {
+					if innerType, ok := body["@type"].(string); ok {
+						itemType = innerType
+					}
+				}
+			}
+		} else {
+			itemType, _ = listItem.Item["@type"].(string)
+		}
+
+		session.Tasks[i] = templates.TaskStatus{
+			Index:   i,
+			Action:  itemType,
+			Status:  "pending",
+			Message: "Waiting to start...",
+		}
+
+		// Try to extract repository info from the action
+		if itemType == "DeleteAction" {
+			if props, ok := listItem.Item["additionalProperty"].(map[string]interface{}); ok {
+				if body, ok := props["body"].(map[string]interface{}); ok {
+					if object, ok := body["object"].(map[string]interface{}); ok {
+						if repoID, ok := object["identifier"].(string); ok {
+							session.Tasks[i].TgtRepo = repoID
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Store session
+	sessionsMutex.Lock()
+	sessions[sessionID] = session
+	sessionsMutex.Unlock()
+
+	// Start workflow execution in background
+	debugLog("Starting background workflow execution for session %s\n", sessionID)
+	go executeSemanticWorkflowWithUpdates(sessionID, workflow)
+
+	// Render initial task list
+	debugLog("Rendering initial task list with %d tasks\n", len(session.Tasks))
+	component := templates.TaskResults(sessionID, session.Tasks)
+	return component.Render(c.Request().Context(), c.Response().Writer)
+}
+
+// uiExecuteSingleSemanticAction processes single semantic actions (not ItemList)
+func uiExecuteSingleSemanticAction(c echo.Context, taskJSON string, rawJSON map[string]interface{}, actionType string) error {
+	// Get user context
+	userID, username, _, authenticated := GetCurrentUser(c)
+	if !authenticated {
+		userID = "anonymous"
+		username = "anonymous"
+	}
+
+	// Create session with single task
+	sessionID := uuid.New().String()
+	session := &TaskSession{
+		ID:        sessionID,
+		Tasks:     make([]templates.TaskStatus, 1),
+		Clients:   make(map[chan templates.TaskStatus]bool),
+		StartTime: time.Now(),
+		UserID:    userID,
+		Username:  username,
+		IPAddress: c.RealIP(),
+		UserAgent: c.Request().UserAgent(),
+	}
+
+	// Initialize single task status
+	session.Tasks[0] = templates.TaskStatus{
+		Index:   0,
+		Action:  actionType,
+		Status:  "pending",
+		Message: "Waiting to start...",
+	}
+
+	// Store session
+	sessionsMutex.Lock()
+	sessions[sessionID] = session
+	sessionsMutex.Unlock()
+
+	// Start action execution in background
+	go executeSingleSemanticActionWithUpdates(sessionID, []byte(taskJSON), actionType)
+
+	// Render initial task list
+	component := templates.TaskResults(sessionID, session.Tasks)
+	return component.Render(c.Request().Context(), c.Response().Writer)
+}
+
 // uiStreamHandler handles SSE connections for real-time task updates
 func uiStreamHandler(c echo.Context) error {
 	sessionID := c.Param("sessionID")
+	debugLog("SSE connection request for session: %s\n", sessionID)
 
 	// Get session
 	sessionsMutex.RLock()
@@ -242,6 +428,7 @@ func uiStreamHandler(c echo.Context) error {
 	sessionsMutex.RUnlock()
 
 	if !exists {
+		debugLog("Session %s not found for SSE connection\n", sessionID)
 		return c.String(http.StatusNotFound, "Session not found")
 	}
 
@@ -250,6 +437,7 @@ func uiStreamHandler(c echo.Context) error {
 	c.Response().Header().Set("Cache-Control", "no-cache")
 	c.Response().Header().Set("Connection", "keep-alive")
 	c.Response().Header().Set("X-Accel-Buffering", "no")
+	c.Response().WriteHeader(http.StatusOK)
 
 	// Create client channel
 	clientChan := make(chan templates.TaskStatus, 10)
@@ -257,18 +445,21 @@ func uiStreamHandler(c echo.Context) error {
 	// Register client
 	session.mutex.Lock()
 	session.Clients[clientChan] = true
+	debugLog("SSE client registered for session %s, total clients: %d\n", sessionID, len(session.Clients))
 	session.mutex.Unlock()
 
 	// Cleanup on disconnect
 	defer func() {
 		session.mutex.Lock()
 		delete(session.Clients, clientChan)
-		session.mutex.Unlock()
 		close(clientChan)
+		debugLog("SSE client disconnected from session %s, remaining clients: %d\n", sessionID, len(session.Clients))
+		session.mutex.Unlock()
 	}()
 
 	// Send current state immediately
 	session.mutex.RLock()
+	debugLog("Sending initial state of %d tasks to SSE client\n", len(session.Tasks))
 	for _, task := range session.Tasks {
 		select {
 		case clientChan <- task:
@@ -276,6 +467,10 @@ func uiStreamHandler(c echo.Context) error {
 		}
 	}
 	session.mutex.RUnlock()
+
+	// Keep-alive ticker
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
 
 	// Stream updates
 	for {
@@ -285,20 +480,26 @@ func uiStreamHandler(c echo.Context) error {
 				return nil
 			}
 
+			debugLog("Sending SSE update for task %d (status: %s)\n", task.Index, task.Status)
+
 			// Render task update
 			component := templates.TaskUpdate(task)
 
 			// Write SSE message
 			if _, err := fmt.Fprintf(c.Response().Writer, "event: task-update\n"); err != nil {
+				debugLog("Failed to write SSE event header: %v\n", err)
 				return err
 			}
 			if _, err := fmt.Fprintf(c.Response().Writer, "data: "); err != nil {
+				debugLog("Failed to write SSE data header: %v\n", err)
 				return err
 			}
 			if err := component.Render(c.Request().Context(), c.Response().Writer); err != nil {
+				debugLog("Failed to render task component: %v\n", err)
 				return err
 			}
 			if _, err := fmt.Fprintf(c.Response().Writer, "\n\n"); err != nil {
+				debugLog("Failed to write SSE terminator: %v\n", err)
 				return err
 			}
 
@@ -307,7 +508,15 @@ func uiStreamHandler(c echo.Context) error {
 				flusher.Flush()
 			}
 
+		case <-ticker.C:
+			// Send keep-alive comment
+			fmt.Fprintf(c.Response().Writer, ": keepalive\n\n")
+			if flusher, ok := c.Response().Writer.(http.Flusher); ok {
+				flusher.Flush()
+			}
+
 		case <-c.Request().Context().Done():
+			debugLog("SSE connection closed by client for session %s\n", sessionID)
 			return nil
 		}
 	}
@@ -520,6 +729,199 @@ func executeTasksWithUpdates(sessionID string, req MigrationRequest) {
 			}
 		}
 	}
+
+	// Cleanup session after 1 hour
+	time.AfterFunc(1*time.Hour, func() {
+		sessionsMutex.Lock()
+		delete(sessions, sessionID)
+		sessionsMutex.Unlock()
+	})
+}
+
+// executeSemanticWorkflowWithUpdates executes an ItemList workflow and updates UI in real-time
+func executeSemanticWorkflowWithUpdates(sessionID string, workflow ItemListWorkflow) {
+	debugLog("executeSemanticWorkflowWithUpdates started for session %s\n", sessionID)
+
+	sessionsMutex.RLock()
+	session, exists := sessions[sessionID]
+	sessionsMutex.RUnlock()
+
+	if !exists {
+		debugLog("Session %s not found, aborting\n", sessionID)
+		return
+	}
+
+	// Determine execution mode (parallel or sequential)
+	if workflow.Parallel {
+		debugLog("Executing workflow in PARALLEL mode (concurrency: %d)\n", workflow.Concurrency)
+		executeSemanticWorkflowParallel(session, workflow)
+	} else {
+		debugLog("Executing workflow in SEQUENTIAL mode")
+		executeSemanticWorkflowSequential(session, workflow)
+	}
+
+	// Mark session as complete
+	now := time.Now()
+	session.mutex.Lock()
+	session.EndTime = &now
+	session.mutex.Unlock()
+
+	// Cleanup session after 1 hour
+	time.AfterFunc(1*time.Hour, func() {
+		sessionsMutex.Lock()
+		delete(sessions, sessionID)
+		sessionsMutex.Unlock()
+	})
+}
+
+// executeSemanticWorkflowSequential executes workflow items one by one
+func executeSemanticWorkflowSequential(session *TaskSession, workflow ItemListWorkflow) {
+	for i, listItem := range workflow.ItemListElement {
+		executeWorkflowItemWithUpdate(session, i, listItem)
+	}
+}
+
+// executeSemanticWorkflowParallel executes workflow items in parallel with concurrency control
+func executeSemanticWorkflowParallel(session *TaskSession, workflow ItemListWorkflow) {
+	concurrency := workflow.Concurrency
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+
+	// Create a semaphore to limit concurrency
+	sem := make(chan struct{}, concurrency)
+	var wg sync.WaitGroup
+
+	for i, listItem := range workflow.ItemListElement {
+		wg.Add(1)
+		go func(idx int, item ListItemNode) {
+			defer wg.Done()
+
+			// Acquire semaphore
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			executeWorkflowItemWithUpdate(session, idx, item)
+		}(i, listItem)
+	}
+
+	// Wait for all tasks to complete
+	wg.Wait()
+}
+
+// executeWorkflowItemWithUpdate executes a single workflow item and updates UI
+func executeWorkflowItemWithUpdate(session *TaskSession, index int, listItem ListItemNode) {
+	taskStartTime := time.Now()
+	debugLog("[Task %d] Starting execution (position: %d)\n", index, listItem.Position)
+
+	// Update status to in-progress
+	session.mutex.Lock()
+	session.Tasks[index].Status = "in-progress"
+	session.Tasks[index].Message = "Executing..."
+	session.Tasks[index].StartTime = taskStartTime.Format("15:04:05")
+	taskUpdate := session.Tasks[index]
+	session.mutex.Unlock()
+
+	// Broadcast update
+	broadcastTaskUpdate(session, taskUpdate)
+
+	// Execute the workflow item (handles ScheduledAction extraction)
+	debugLog("[Task %d] Calling executeWorkflowItem\n", index)
+	result, err := executeWorkflowItem(nil, listItem, index)
+	debugLog("[Task %d] executeWorkflowItem completed, err=%v\n", index, err)
+
+	taskEndTime := time.Now()
+	duration := taskEndTime.Sub(taskStartTime)
+
+	// Update task status based on result
+	session.mutex.Lock()
+	if err != nil {
+		session.Tasks[index].Status = "error"
+		session.Tasks[index].Message = fmt.Sprintf("Error: %v", err)
+	} else {
+		session.Tasks[index].Status = "success"
+		if msg, ok := result["message"].(string); ok {
+			session.Tasks[index].Message = msg
+		} else if resultData, ok := result["result"].(map[string]interface{}); ok {
+			if msg, ok := resultData["message"].(string); ok {
+				session.Tasks[index].Message = msg
+			} else {
+				session.Tasks[index].Message = "Task completed successfully"
+			}
+		} else {
+			session.Tasks[index].Message = "Task completed successfully"
+		}
+	}
+	session.Tasks[index].EndTime = taskEndTime.Format("15:04:05")
+	session.Tasks[index].Duration = formatDuration(duration)
+	taskUpdate = session.Tasks[index]
+	session.mutex.Unlock()
+
+	// Broadcast final update
+	broadcastTaskUpdate(session, taskUpdate)
+}
+
+// executeSingleSemanticActionWithUpdates executes a single semantic action and updates UI
+func executeSingleSemanticActionWithUpdates(sessionID string, jsonData []byte, actionType string) {
+	sessionsMutex.RLock()
+	session, exists := sessions[sessionID]
+	sessionsMutex.RUnlock()
+
+	if !exists {
+		return
+	}
+
+	taskStartTime := time.Now()
+
+	// Update status to in-progress
+	session.mutex.Lock()
+	session.Tasks[0].Status = "in-progress"
+	session.Tasks[0].Message = "Executing..."
+	session.Tasks[0].StartTime = taskStartTime.Format("15:04:05")
+	taskUpdate := session.Tasks[0]
+	session.mutex.Unlock()
+
+	// Broadcast update
+	broadcastTaskUpdate(session, taskUpdate)
+
+	// Execute the action
+	result, err := executeActionDirect(nil, actionType, jsonData)
+
+	taskEndTime := time.Now()
+	duration := taskEndTime.Sub(taskStartTime)
+
+	// Update task status based on result
+	session.mutex.Lock()
+	if err != nil {
+		session.Tasks[0].Status = "error"
+		session.Tasks[0].Message = fmt.Sprintf("Error: %v", err)
+	} else {
+		session.Tasks[0].Status = "success"
+		if msg, ok := result["message"].(string); ok {
+			session.Tasks[0].Message = msg
+		} else if resultData, ok := result["result"].(map[string]interface{}); ok {
+			if msg, ok := resultData["message"].(string); ok {
+				session.Tasks[0].Message = msg
+			} else {
+				session.Tasks[0].Message = "Task completed successfully"
+			}
+		} else {
+			session.Tasks[0].Message = "Task completed successfully"
+		}
+	}
+	session.Tasks[0].EndTime = taskEndTime.Format("15:04:05")
+	session.Tasks[0].Duration = formatDuration(duration)
+	taskUpdate = session.Tasks[0]
+	session.mutex.Unlock()
+
+	// Broadcast final update
+	broadcastTaskUpdate(session, taskUpdate)
+
+	// Mark session as complete
+	now := time.Now()
+	session.mutex.Lock()
+	session.EndTime = &now
+	session.mutex.Unlock()
 
 	// Cleanup session after 1 hour
 	time.AfterFunc(1*time.Hour, func() {
