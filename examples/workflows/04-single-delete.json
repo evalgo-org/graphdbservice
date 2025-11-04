@@ -1,0 +1,41 @@
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "identifier": "delete-consumption-navigator-repos",
+  "name": "Delete Consumption Navigator Repositories",
+  "description": "Delete multiple Consumption Navigator country-specific repositories in parallel",
+  "parallel": true,
+  "concurrency": 5,
+  "itemListElement": [{
+      "@type": "ListItem",
+      "position": 1,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-ae",
+        "name": "Delete Consumption Navigator AE Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-ae",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-AR-Intern-All",
+              "codeRepository": "http://localhost:7200/repositories/Consumption-Navigator-AR-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com/",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    }]
+}

@@ -64,6 +64,82 @@ curl -X POST http://localhost:3000/api/workflows/create \
 - Each graph is exported from source and imported to target
 - Independent failure handling per graph
 
+### 07-repo-create-with-config.json
+**Purpose**: Create a new GraphDB repository with Turtle configuration file
+
+**Action Type**: `CreateAction` with multipart/form-data file upload
+
+**File Upload Required**: Yes - Turtle (.ttl) configuration file
+
+**Usage**:
+```bash
+# Using the provided shell script
+./create-repo-example.sh
+
+# Or using curl directly with multipart upload
+curl -X POST http://localhost:8080/v1/api/semantic/action \
+  -H "x-api-key: your-api-key" \
+  -F "action=@07-repo-create-with-config.json;type=application/json" \
+  -F "config=@repo-config-example.ttl"
+```
+
+**What it does**:
+- Creates a new GraphDB repository from scratch
+- Uploads Turtle configuration file with repository settings
+- Configures ruleset, storage, indexing, and query settings
+- Returns repository creation status
+
+**Files**:
+- `07-repo-create-with-config.json` - JSON-LD CreateAction
+- `repo-config-example.ttl` - Sample Turtle configuration
+- `create-repo-example.sh` - Helper script for easy execution
+- `REPO_CREATE_EXAMPLE.md` - Detailed documentation
+
+**See also**: [REPO_CREATE_EXAMPLE.md](./REPO_CREATE_EXAMPLE.md) for detailed documentation and customization guide.
+
+### 08-graph-import-with-data.json
+**Purpose**: Import RDF data files into a named graph in GraphDB repository
+
+**Action Type**: `UploadAction` with multipart/form-data file upload
+
+**File Upload Required**: Yes - RDF data file (Turtle, RDF/XML, N-Triples, Binary RDF, etc.)
+
+**Usage**:
+```bash
+# Using the provided shell script
+./import-data-example.sh
+
+# Or using curl directly with multipart upload
+curl -X POST http://localhost:8080/v1/api/semantic/action \
+  -H "x-api-key: your-api-key" \
+  -F "action=@08-graph-import-with-data.json" \
+  -F "data=@sample-data.ttl"
+```
+
+**What it does**:
+- Uploads RDF data file to GraphDB repository
+- Imports data into specified named graph
+- Supports all RDF formats (Turtle, RDF/XML, N-Triples, N-Quads, TriG, JSON-LD, BRF)
+- Can import multiple files in a single request
+- Returns import status and statistics
+
+**Files**:
+- `08-graph-import-with-data.json` - JSON-LD UploadAction
+- `sample-data.ttl` - Example Turtle data file with ~50 triples
+- `import-data-example.sh` - Helper script for easy execution
+- `GRAPH_IMPORT_EXAMPLE.md` - Detailed documentation with SPARQL examples
+
+**Supported Formats**:
+- `.ttl` - Turtle (human-readable, compact)
+- `.rdf`, `.xml` - RDF/XML
+- `.nt` - N-Triples (line-based)
+- `.nq` - N-Quads (with graph context)
+- `.trig` - TriG (Turtle with named graphs)
+- `.jsonld` - JSON-LD
+- `.brf` - Binary RDF (fastest, GraphDB proprietary)
+
+**See also**: [GRAPH_IMPORT_EXAMPLE.md](./GRAPH_IMPORT_EXAMPLE.md) for detailed documentation, SPARQL query examples, and performance tips.
+
 ## Environment Variables
 
 Before running these workflows, set up your credentials:

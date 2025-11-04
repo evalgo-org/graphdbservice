@@ -3,7 +3,9 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
+	"strings"
 
 	"eve.evalgo.org/semantic"
 	"github.com/labstack/echo/v4"
@@ -16,7 +18,7 @@ import (
 // @Summary Execute semantic GraphDB operations
 // @Description Accept Schema.org JSON-LD actions for GraphDB operations (TransferAction, CreateAction, etc.)
 // @Tags Migration
-// @Accept json
+// @Accept json,multipart/form-data
 // @Produce json
 // @Param x-api-key header string true "API Key"
 // @Param action body object true "Schema.org JSON-LD Action"
@@ -27,6 +29,13 @@ import (
 // @Security ApiKeyAuth
 // @Router /v1/api/semantic/action [post]
 func handleSemanticAction(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+
+	// Check if this is a multipart/form-data request
+	if contentType != "" && strings.HasPrefix(contentType, "multipart/form-data") {
+		return handleSemanticActionMultipart(c)
+	}
+
 	// Parse raw JSON to determine format
 	var rawJSON map[string]interface{}
 	if err := c.Bind(&rawJSON); err != nil {
@@ -46,6 +55,210 @@ func handleSemanticAction(c echo.Context) error {
 
 	// Fallback to legacy format
 	return echo.NewHTTPError(http.StatusBadRequest, "Request must be Schema.org JSON-LD with @type field")
+}
+
+// handleSemanticActionMultipart handles multipart/form-data requests with file uploads
+// This is used for operations like CreateAction with config files or UploadAction with data files
+func handleSemanticActionMultipart(c echo.Context) error {
+	// Parse the multipart request using EVE semantic library
+	semanticReq, err := semantic.ParseMultipartSemanticRequest(c.Request())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse multipart request: %v", err))
+	}
+
+	// Convert the parsed action to map for routing
+	actionJSON, err := json.Marshal(semanticReq.Action)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to marshal action: %v", err))
+	}
+
+	var actionMap map[string]interface{}
+	if err := json.Unmarshal(actionJSON, &actionMap); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to unmarshal action: %v", err))
+	}
+
+	// Get action type
+	actionType, ok := actionMap["@type"].(string)
+	if !ok {
+		return echo.NewHTTPError(http.StatusBadRequest, "Missing or invalid @type in action")
+	}
+
+	// Convert EVE multipart files to the format expected by processTask
+	files := make(map[string][]*multipart.FileHeader)
+	for key, fileHeaders := range semanticReq.Files {
+		files[key] = fileHeaders
+	}
+
+	// Route based on action type and execute with files
+	switch actionType {
+	case "CreateAction":
+		return executeSemanticCreateActionWithFiles(c, actionJSON, files)
+
+	case "UploadAction":
+		return executeSemanticUploadActionWithFiles(c, actionJSON, files)
+
+	default:
+		// For other action types, execute without files
+		return handleJSONLDAction(c, actionMap)
+	}
+}
+
+// executeSemanticCreateActionWithFiles handles CreateAction with file uploads
+func executeSemanticCreateActionWithFiles(c echo.Context, actionJSON []byte, files map[string][]*multipart.FileHeader) error {
+	var action semantic.CreateAction
+	if err := json.Unmarshal(actionJSON, &action); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse CreateAction: %v", err))
+	}
+
+	repo, err := extractRepository(action.Result)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid result: %v", err))
+	}
+
+	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(repo)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid credentials: %v", err))
+	}
+	tgtURL = normalizeURL(tgtURL)
+
+	// Create task with repository info
+	task := Task{
+		Action: "repo-create",
+		Tgt: &Repository{
+			URL:      tgtURL,
+			Username: tgtUser,
+			Password: tgtPass,
+			Repo:     tgtRepoName,
+		},
+	}
+
+	// The files are passed with key "config" for repository creation
+	// Convert to the format expected by processTask: task_0_config
+	taskFiles := make(map[string][]*multipart.FileHeader)
+	if configFiles, exists := files["config"]; exists && len(configFiles) > 0 {
+		taskFiles["task_0_config"] = configFiles
+	}
+
+	// Execute the task with files
+	result, err := processTask(task, taskFiles, 0)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Creation failed: %v", err))
+	}
+
+	// Return semantic response
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"@context":     "https://schema.org",
+		"@type":        "CreateAction",
+		"identifier":   action.Identifier,
+		"actionStatus": "CompletedActionStatus",
+		"result":       result,
+	})
+}
+
+// executeSemanticUploadActionWithFiles handles UploadAction with file uploads
+func executeSemanticUploadActionWithFiles(c echo.Context, actionJSON []byte, files map[string][]*multipart.FileHeader) error {
+	var action semantic.UploadAction
+	if err := json.Unmarshal(actionJSON, &action); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse UploadAction: %v", err))
+	}
+
+	targetRepo, err := extractRepository(action.Target)
+	if err != nil {
+		if catalog, ok := action.Target.(*semantic.DataCatalog); ok {
+			props := catalog.Properties
+			if props == nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "Missing credentials in target")
+			}
+
+			username, _ := props["username"].(string)
+			password, _ := props["password"].(string)
+			serverURL, _ := props["serverUrl"].(string)
+
+			targetRepo = &semantic.GraphDBRepository{
+				Identifier: catalog.Identifier,
+				Properties: map[string]interface{}{
+					"serverUrl": serverURL,
+					"username":  username,
+					"password":  password,
+				},
+			}
+		} else {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid target: %v", err))
+		}
+	}
+
+	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(targetRepo)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid target credentials: %v", err))
+	}
+	tgtURL = normalizeURL(tgtURL)
+
+	graph, graphErr := extractGraph(action.Object)
+	if graphErr == nil {
+		graphURI := semantic.ExtractGraphIdentifier(graph)
+
+		task := Task{
+			Action: "graph-import",
+			Tgt: &Repository{
+				URL:      tgtURL,
+				Username: tgtUser,
+				Password: tgtPass,
+				Repo:     tgtRepoName,
+				Graph:    graphURI,
+			},
+		}
+
+		// The files are passed with key "data" for graph import
+		// Convert to the format expected by processTask: task_0_files
+		taskFiles := make(map[string][]*multipart.FileHeader)
+		if dataFiles, exists := files["data"]; exists && len(dataFiles) > 0 {
+			taskFiles["task_0_files"] = dataFiles
+		}
+
+		result, err := processTask(task, taskFiles, 0)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Graph import failed: %v", err))
+		}
+
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"@context":     "https://schema.org",
+			"@type":        "UploadAction",
+			"identifier":   action.Identifier,
+			"actionStatus": "CompletedActionStatus",
+			"result":       result,
+		})
+	}
+
+	// Repository import (BRF file)
+	task := Task{
+		Action: "repo-import",
+		Tgt: &Repository{
+			URL:      tgtURL,
+			Username: tgtUser,
+			Password: tgtPass,
+			Repo:     tgtRepoName,
+		},
+	}
+
+	// The files are passed with key "data" for repo import
+	// Convert to the format expected by processTask: task_0_files
+	taskFiles := make(map[string][]*multipart.FileHeader)
+	if dataFiles, exists := files["data"]; exists && len(dataFiles) > 0 {
+		taskFiles["task_0_files"] = dataFiles
+	}
+
+	result, err := processTask(task, taskFiles, 0)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Repository import failed: %v", err))
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"@context":     "https://schema.org",
+		"@type":        "UploadAction",
+		"identifier":   action.Identifier,
+		"actionStatus": "CompletedActionStatus",
+		"result":       result,
+	})
 }
 
 // isSemanticActionType checks if a type string is a semantic action

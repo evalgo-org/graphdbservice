@@ -1,0 +1,1579 @@
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "identifier": "delete-consumption-navigator-repos",
+  "name": "Delete Consumption Navigator Repositories",
+  "description": "Delete multiple Consumption Navigator country-specific repositories in parallel",
+  "parallel": true,
+  "concurrency": 5,
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-ae",
+        "name": "Delete Consumption Navigator AE Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-ae",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-AE-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-AE-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-ar",
+        "name": "Delete Consumption Navigator AR Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-ar",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-AR-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-AR-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-at",
+        "name": "Delete Consumption Navigator AT Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-at",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-AT-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-AT-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 4,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-au",
+        "name": "Delete Consumption Navigator AU Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-au",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-AU-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-AU-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 5,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-be",
+        "name": "Delete Consumption Navigator BE Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-be",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-BE-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-BE-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 6,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-br",
+        "name": "Delete Consumption Navigator BR Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-br",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-BR-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-BR-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 7,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-ca",
+        "name": "Delete Consumption Navigator CA Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-ca",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-CA-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-CA-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 8,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-ch",
+        "name": "Delete Consumption Navigator CH Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-ch",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-CH-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-CH-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 9,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-cl",
+        "name": "Delete Consumption Navigator CL Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-cl",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-CL-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-CL-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 10,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-cn",
+        "name": "Delete Consumption Navigator CN Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-cn",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-CN-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-CN-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 11,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-co",
+        "name": "Delete Consumption Navigator CO Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-co",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-CO-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-CO-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 12,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-cr",
+        "name": "Delete Consumption Navigator CR Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-cr",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-CR-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-CR-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 13,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-cz",
+        "name": "Delete Consumption Navigator CZ Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-cz",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-CZ-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-CZ-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 14,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-dk",
+        "name": "Delete Consumption Navigator DK Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-dk",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-DK-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-DK-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 15,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-ec",
+        "name": "Delete Consumption Navigator EC Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-ec",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-EC-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-EC-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 16,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-es",
+        "name": "Delete Consumption Navigator ES Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-es",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-ES-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-ES-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 17,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-fi",
+        "name": "Delete Consumption Navigator FI Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-fi",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-FI-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-FI-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 18,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-fr",
+        "name": "Delete Consumption Navigator FR Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-fr",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-FR-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-FR-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 19,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-gt",
+        "name": "Delete Consumption Navigator GT Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-gt",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-GT-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-GT-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 20,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-hn",
+        "name": "Delete Consumption Navigator HN Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-hn",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-HN-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-HN-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 21,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-hr",
+        "name": "Delete Consumption Navigator HR Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-hr",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-HR-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-HR-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 22,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-hu",
+        "name": "Delete Consumption Navigator HU Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-hu",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-HU-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-HU-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 23,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-ie",
+        "name": "Delete Consumption Navigator IE Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-ie",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-IE-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-IE-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 24,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-il",
+        "name": "Delete Consumption Navigator IL Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-il",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-IL-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-IL-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 25,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-in",
+        "name": "Delete Consumption Navigator IN Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-in",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-IN-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-IN-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 26,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-it",
+        "name": "Delete Consumption Navigator IT Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-it",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-IT-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-IT-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 27,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-jp",
+        "name": "Delete Consumption Navigator JP Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-jp",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-JP-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-JP-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 28,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-ke",
+        "name": "Delete Consumption Navigator KE Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-ke",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-KE-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-KE-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 29,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-kr",
+        "name": "Delete Consumption Navigator KR Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-kr",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-KR-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-KR-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 30,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-mx",
+        "name": "Delete Consumption Navigator MX Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-mx",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-MX-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-MX-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 31,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-my",
+        "name": "Delete Consumption Navigator MY Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-my",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-MY-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-MY-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 32,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-nl",
+        "name": "Delete Consumption Navigator NL Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-nl",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-NL-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-NL-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 33,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-no",
+        "name": "Delete Consumption Navigator NO Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-no",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-NO-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-NO-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 34,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-nz",
+        "name": "Delete Consumption Navigator NZ Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-nz",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-NZ-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-NZ-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 35,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-pa",
+        "name": "Delete Consumption Navigator PA Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-pa",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-PA-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-PA-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 36,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-pe",
+        "name": "Delete Consumption Navigator PE Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-pe",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-PE-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-PE-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 37,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-ph",
+        "name": "Delete Consumption Navigator PH Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-ph",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-PH-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-PH-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 38,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-pl",
+        "name": "Delete Consumption Navigator PL Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-pl",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-PL-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-PL-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 39,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-pt",
+        "name": "Delete Consumption Navigator PT Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-pt",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-PT-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-PT-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 40,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-ro",
+        "name": "Delete Consumption Navigator RO Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-ro",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-RO-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-RO-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 41,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-ru",
+        "name": "Delete Consumption Navigator RU Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-ru",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-RU-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-RU-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 42,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-se",
+        "name": "Delete Consumption Navigator SE Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-se",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-SE-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-SE-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 43,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-sg",
+        "name": "Delete Consumption Navigator SG Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-sg",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-SG-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-SG-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 44,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-si",
+        "name": "Delete Consumption Navigator SI Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-si",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-SI-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-SI-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 45,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-sv",
+        "name": "Delete Consumption Navigator SV Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-sv",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-SV-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-SV-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 46,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-th",
+        "name": "Delete Consumption Navigator TH Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-th",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-TH-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-TH-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 47,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-tz",
+        "name": "Delete Consumption Navigator TZ Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-tz",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-TZ-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-TZ-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 48,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-ua",
+        "name": "Delete Consumption Navigator UA Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-ua",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-UA-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-UA-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 49,
+      "item": {
+        "@type": "ScheduledAction",
+        "identifier": "delete-consumption-navigator-za",
+        "name": "Delete Consumption Navigator ZA Repository",
+        "additionalProperty": {
+          "url": "http://localhost:8080/v1/api/semantic/action",
+          "httpMethod": "POST",
+          "headers": {
+            "x-api-key": "${GRAPHDB_API_KEY}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "@context": "https://schema.org",
+            "@type": "DeleteAction",
+            "identifier": "delete-repo-za",
+            "object": {
+              "@type": "SoftwareSourceCode",
+              "identifier": "Consumption-Navigator-ZA-Intern-All",
+              "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-ZA-Intern-All",
+              "additionalProperty": {
+                "serverUrl": "https://kks-dev.ontotext.com",
+                "username": "kaeser-admin",
+                "password": "erP*9n_~RV-6K|RYe,xw"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

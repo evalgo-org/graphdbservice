@@ -133,8 +133,8 @@ func (d *debugHTTPTransport) RoundTrip(req *http.Request) (*http.Response, error
 	// Log response status
 	debugLogHTTP("Response Status: %d %s", resp.StatusCode, resp.Status)
 
-	// If it's an error status, read and log the body
-	if resp.StatusCode >= 400 && debugMode {
+	// Read and log the response body only for errors if debug mode is enabled
+	if debugMode && resp.StatusCode >= 400 {
 		bodyBytes, readErr := io.ReadAll(resp.Body)
 		resp.Body.Close()
 
@@ -142,9 +142,7 @@ func (d *debugHTTPTransport) RoundTrip(req *http.Request) (*http.Response, error
 			debugLogHTTP("Failed to read error response body: %v", readErr)
 		} else {
 			debugLogHTTP("===== ERROR RESPONSE BODY (Status %d) =====", resp.StatusCode)
-			if debugMode {
-				fmt.Printf("%s\n", string(bodyBytes))
-			}
+			fmt.Printf("%s\n", string(bodyBytes))
 			debugLogHTTP("===== END ERROR RESPONSE BODY =====")
 
 			// Restore the body for the caller
@@ -1057,6 +1055,12 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 	srcClient := http.DefaultClient
 	tgtClient := http.DefaultClient
 
+	// Enable HTTP debug logging if debug mode is active
+	if debugMode {
+		srcClient = enableHTTPDebugLogging(srcClient)
+		tgtClient = enableHTTPDebugLogging(tgtClient)
+	}
+
 	debugLog("Processing task action: %s", task.Action)
 
 	result := map[string]interface{}{
@@ -1075,6 +1079,9 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 			if err != nil {
 				return nil, err
 			}
+			if debugMode {
+				srcClient = enableHTTPDebugLogging(srcClient)
+			}
 			tgtURL, err := URL2ServiceRobust(task.Tgt.URL)
 			if err != nil {
 				return nil, err
@@ -1082,6 +1089,9 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 			tgtClient, err = db.GraphDBZitiClient(identityFile, tgtURL)
 			if err != nil {
 				return nil, err
+			}
+			if debugMode {
+				tgtClient = enableHTTPDebugLogging(tgtClient)
 			}
 		}
 		db.HttpClient = srcClient
@@ -1257,13 +1267,13 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 				debugLog("Failed to create Ziti client: %v", err)
 				return nil, err
 			}
+			if debugMode {
+				tgtClient = enableHTTPDebugLogging(tgtClient)
+			}
 			debugLog("Ziti client created successfully")
 		}
 
-		// Enable HTTP debug logging to capture response bodies
-		tgtClient = enableHTTPDebugLogging(tgtClient)
 		db.HttpClient = tgtClient
-		debugLog("HTTP debug logging enabled")
 
 		debugLog("Fetching list of repositories...")
 		tgtGraphDB, err := db.GraphDBRepositories(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password)
@@ -2048,6 +2058,11 @@ var graphdbCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		identityFile, _ = cmd.Flags().GetString("identity")
 		debugMode, _ = cmd.Flags().GetBool("debug")
+
+		// Check environment variable for debug mode
+		if os.Getenv("DEBUG") == "true" || os.Getenv("GRAPHDB_DEBUG") == "true" {
+			debugMode = true
+		}
 
 		if debugMode {
 			fmt.Println("DEBUG mode enabled - detailed logging active")

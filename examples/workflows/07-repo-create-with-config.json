@@ -1,0 +1,18 @@
+{
+  "@context": "https://schema.org",
+  "@type": "CreateAction",
+  "identifier": "create-new-repository",
+  "name": "Create New GraphDB Repository",
+  "description": "Create a new GraphDB repository using a Turtle configuration file",
+  "result": {
+    "@type": "SoftwareSourceCode",
+    "identifier": "Consumption-Navigator-DE-Intern-All-test1-amir12",
+    "codeRepository": "https://kks-dev.ontotext.com/repositories/Consumption-Navigator-DE-Intern-All-test1-amir12",
+    "accessMode": "authenticated",
+    "additionalProperty": {
+      "serverUrl": "https://kks-dev.ontotext.com",
+      "username": "kaeser-admin",
+      "password": "erP*9n_~RV-6K|RYe,xw"
+    }
+  }
+}

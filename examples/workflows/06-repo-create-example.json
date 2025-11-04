@@ -1,0 +1,32 @@
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "identifier": "create-new-repository",
+  "name": "Create New Repository Example",
+  "description": "Example workflow for creating a new GraphDB repository (requires multipart/form-data support)",
+  "parallel": false,
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "item": {
+        "@type": "CreateAction",
+        "identifier": "create-test-repo",
+        "name": "Create Test Repository",
+        "description": "Create a new GraphDB repository with configuration",
+        "result": {
+          "@type": "SoftwareSourceCode",
+          "identifier": "test-repository",
+          "codeRepository": "http://localhost:7200/repositories/test-repository",
+          "accessMode": "authenticated",
+          "additionalProperty": {
+            "serverUrl": "http://localhost:7200",
+            "username": "admin",
+            "password": "admin"
+          }
+        },
+        "comment": "NOTE: This requires multipart/form-data with 'task_0_config' file containing the Turtle repository configuration. The semantic JSON-LD endpoint does not currently support file uploads."
+      }
+    }
+  ]
+}
