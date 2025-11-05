@@ -3,7 +3,7 @@ module evalgo.org/graphservice
 go 1.25.1
 
 require (
-	eve.evalgo.org v0.0.20
+	eve.evalgo.org v0.0.25
 	github.com/a-h/templ v0.3.960
 	github.com/gofrs/flock v0.13.0
 	github.com/golang-jwt/jwt/v5 v5.3.0

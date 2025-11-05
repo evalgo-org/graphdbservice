@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"evalgo.org/graphservice/auth"
+	// "evalgo.org/graphservice/auth" // Disabled for semantic service
 	"evalgo.org/graphservice/web/templates"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
