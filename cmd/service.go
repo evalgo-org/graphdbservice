@@ -3,14 +3,15 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"eve.evalgo.org/common"
+	"eve.evalgo.org/config"
+	evehttp "eve.evalgo.org/http"
+	"eve.evalgo.org/registry"
 	"github.com/spf13/cobra"
 )
 
@@ -50,34 +51,39 @@ func init() {
 }
 
 func runSemanticService(cmd *cobra.Command, args []string) {
-	// Get configuration
-	port, _ := cmd.Flags().GetInt("port")
-	serviceURL, _ := cmd.Flags().GetString("service-url")
-	registryURL, _ := cmd.Flags().GetString("registry-url")
-	apiKey, _ := cmd.Flags().GetString("api-key")
-	debug, _ := cmd.Flags().GetBool("debug")
+	// Load configuration using EVE config utilities
+	env := config.NewEnvConfig("GRAPHDB")
+	serverConfig := evehttp.DefaultServerConfig()
+	serverConfig.Port = env.GetInt("SERVICE_PORT", 8080)
+	serverConfig.Debug = env.GetBool("DEBUG", false)
+	serverConfig.BodyLimit = "100M"
 
-	// Override with environment variables
-	if envPort := os.Getenv("GRAPHDB_SERVICE_PORT"); envPort != "" {
-		fmt.Sscanf(envPort, "%d", &port)
+	// Service configuration
+	serviceURL := env.GetString("SERVICE_URL", "")
+	registryURL := env.GetString("REGISTRY_URL", "http://localhost:8096")
+	apiKey := env.GetString("API_KEY", "")
+
+	// Override from flags if provided
+	if flagPort, _ := cmd.Flags().GetInt("port"); flagPort != 0 {
+		serverConfig.Port = flagPort
 	}
-	if envURL := os.Getenv("GRAPHDB_SERVICE_URL"); envURL != "" {
-		serviceURL = envURL
+	if flagURL, _ := cmd.Flags().GetString("service-url"); flagURL != "" {
+		serviceURL = flagURL
 	}
-	if envRegistry := os.Getenv("REGISTRYSERVICE_API_URL"); envRegistry != "" {
-		registryURL = envRegistry
+	if flagRegistry, _ := cmd.Flags().GetString("registry-url"); flagRegistry != "" {
+		registryURL = flagRegistry
 	}
-	if envKey := os.Getenv("API_KEY"); envKey != "" {
-		apiKey = envKey
+	if flagKey, _ := cmd.Flags().GetString("api-key"); flagKey != "" {
+		apiKey = flagKey
 	}
-	if os.Getenv("DEBUG") == "true" {
-		debug = true
+	if flagDebug, _ := cmd.Flags().GetBool("debug"); flagDebug {
+		serverConfig.Debug = true
 	}
 
 	// Set debug mode globally
-	debugMode = debug
+	debugMode = serverConfig.Debug
 
-	// Determine service URL
+	// Determine service URL if not provided
 	if serviceURL == "" {
 		hostname := os.Getenv("HOSTNAME")
 		if hostname == "" {
@@ -87,117 +93,121 @@ func runSemanticService(cmd *cobra.Command, args []string) {
 				hostname = "localhost"
 			}
 		}
-		serviceURL = fmt.Sprintf("http://%s:%d", hostname, port)
+		serviceURL = fmt.Sprintf("http://%s:%d", hostname, serverConfig.Port)
 	}
 
-	// Default registry URL
-	if registryURL == "" {
-		registryURL = "http://localhost:8096"
-	}
+	// Setup structured logging
+	logger := common.ServiceLogger("graphdb-service", "2.0.0")
+	logger.Info("=====================================")
+	logger.Info("GraphDB Semantic Service Starting")
+	logger.Info("=====================================")
+	logger.WithFields(map[string]interface{}{
+		"service_url":  serviceURL,
+		"registry_url": registryURL,
+		"port":         serverConfig.Port,
+		"debug":        serverConfig.Debug,
+		"api_key_set":  apiKey != "",
+	}).Info("Configuration loaded")
 
-	fmt.Println("=====================================")
-	fmt.Println("GraphDB Semantic Service")
-	fmt.Println("=====================================")
-	fmt.Printf("Service URL: %s\n", serviceURL)
-	fmt.Printf("Registry URL: %s\n", registryURL)
-	fmt.Printf("Port: %d\n", port)
-	if apiKey != "" {
-		fmt.Println("API Key: *** (protected)")
-	} else {
-		fmt.Println("API Key: None (service is unprotected)")
-	}
-	fmt.Printf("Debug Mode: %v\n", debug)
-	fmt.Println("=====================================")
+	// Create Echo server with EVE http utilities
+	e := evehttp.NewEchoServer(serverConfig)
 
-	// Create Echo instance
-	e := echo.New()
-	e.HideBanner = true
-	e.HidePort = true
-
-	// Middleware
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-	e.Use(middleware.BodyLimit("100M"))
-	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"*"},
-		AllowMethods: []string{echo.GET, echo.HEAD, echo.PUT, echo.PATCH, echo.POST, echo.DELETE},
-		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, "x-api-key"},
-	}))
+	// Add security headers middleware
+	e.Use(evehttp.SecurityHeadersMiddleware())
 
 	// API key middleware (if configured)
 	if apiKey != "" {
-		apiKeyMiddleware := func(next echo.HandlerFunc) echo.HandlerFunc {
-			return func(c echo.Context) error {
-				key := c.Request().Header.Get("x-api-key")
-				if key != apiKey {
-					return echo.NewHTTPError(http.StatusUnauthorized, "Invalid or missing API key")
-				}
-				return next(c)
-			}
-		}
 		// Semantic action endpoint with API key protection
-		e.POST("/v1/api/semantic/action", handleSemanticAction, apiKeyMiddleware)
+		e.POST("/v1/api/semantic/action", handleSemanticAction, evehttp.APIKeyMiddleware(apiKey))
 	} else {
 		// Semantic action endpoint without protection
 		e.POST("/v1/api/semantic/action", handleSemanticAction)
 	}
 
-	// Health check endpoint (always public)
-	e.GET("/health", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"status":  "healthy",
-			"service": "graphdb-semantic",
-			"version": "2.0.0",
-		})
-	})
+	// Health check endpoint using EVE utilities (always public)
+	e.GET("/health", evehttp.HealthCheckHandler("graphdb-semantic", "2.0.0"))
 
 	// Start server in goroutine
 	go func() {
-		addr := fmt.Sprintf(":%d", port)
-		fmt.Printf("\nStarting server on %s\n", addr)
-		fmt.Printf("Semantic endpoint: POST %s/v1/api/semantic/action\n", serviceURL)
-		fmt.Printf("Health endpoint: GET %s/health\n\n", serviceURL)
+		logger.WithFields(map[string]interface{}{
+			"port":              serverConfig.Port,
+			"semantic_endpoint": fmt.Sprintf("%s/v1/api/semantic/action", serviceURL),
+			"health_endpoint":   fmt.Sprintf("%s/health", serviceURL),
+		}).Info("Starting HTTP server")
 
-		if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
-			fmt.Printf("FATAL: Failed to start server: %v\n", err)
-			os.Exit(1)
+		if err := evehttp.StartServer(e, serverConfig); err != nil {
+			logger.WithError(err).Fatal("Failed to start server")
 		}
 	}()
 
 	// Wait for server to be ready
 	time.Sleep(500 * time.Millisecond)
 
+	// Create registry client using EVE registry utilities
+	registryClient := registry.NewClient(registry.ClientConfig{
+		RegistryURL: registryURL,
+		Timeout:     10 * time.Second,
+	})
+
 	// Register with registry service
 	ctx := context.Background()
-	if err := registerWithRegistry(ctx, serviceURL, registryURL); err != nil {
-		fmt.Printf("WARNING: Failed to register with registry: %v\n", err)
-		fmt.Println("Service will continue without registry registration")
-	} else {
-		fmt.Println("Successfully registered with registry service")
-		// Start heartbeat
-		go startRegistryHeartbeat(ctx, serviceURL, registryURL)
+	hostname := os.Getenv("HOSTNAME")
+	if hostname == "" {
+		var err error
+		hostname, err = os.Hostname()
+		if err != nil {
+			hostname = "localhost"
+		}
 	}
 
-	fmt.Println("\nService is ready. Press Ctrl+C to stop.")
+	err := registryClient.Register(ctx, registry.ServiceConfig{
+		ServiceID:   fmt.Sprintf("graphdb-service-%s", hostname),
+		ServiceName: fmt.Sprintf("GraphDB Service - %s", hostname),
+		ServiceURL:  serviceURL,
+		Version:     "2.0.0",
+		Hostname:    hostname,
+		ServiceType: "graphdb",
+		Capabilities: []string{
+			"graphdb-migration", "graphdb-create", "graphdb-delete",
+			"graphdb-rename", "graphdb-import", "graphdb-export",
+			"graph-migration", "graph-import", "graph-export",
+			"graph-delete", "graph-rename",
+		},
+		Properties: map[string]interface{}{
+			"semanticEndpoint": fmt.Sprintf("%s/v1/api/semantic/action", serviceURL),
+			"healthEndpoint":   fmt.Sprintf("%s/health", serviceURL),
+		},
+	})
+
+	if err != nil {
+		logger.WithError(err).Warn("Failed to register with registry, service will continue without registration")
+	} else {
+		logger.Info("Successfully registered with registry service")
+		// Start heartbeat using registry client
+		cancelHeartbeat := registryClient.StartHeartbeat(ctx, 30*time.Second)
+		defer cancelHeartbeat()
+	}
+
+	logger.Info("Service is ready. Press Ctrl+C to stop.")
 
 	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 
-	fmt.Println("\nShutting down service...")
+	logger.Info("Shutting down service...")
 
-	// Deregister from registry
-	if err := deregisterFromRegistry(context.Background(), serviceURL, registryURL); err != nil {
-		fmt.Printf("WARNING: Failed to deregister: %v\n", err)
+	// Deregister from registry using EVE registry utilities
+	if err := registryClient.Deregister(context.Background()); err != nil {
+		logger.WithError(err).Warn("Failed to deregister from registry")
+	} else {
+		logger.Info("Successfully deregistered from registry")
 	}
 
-	// Shutdown server
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := e.Shutdown(ctx); err != nil {
-		fmt.Printf("Error during shutdown: %v\n", err)
+	// Shutdown server using EVE http utilities
+	if err := evehttp.GracefulShutdown(e, serverConfig.ShutdownTimeout); err != nil {
+		logger.WithError(err).Error("Error during graceful shutdown")
 	}
 
-	fmt.Println("Service stopped")
+	logger.Info("Service stopped")
 }
