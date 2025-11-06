@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"strings"
@@ -36,25 +37,37 @@ func handleSemanticAction(c echo.Context) error {
 		return handleSemanticActionMultipart(c)
 	}
 
-	// Parse raw JSON to determine format
-	var rawJSON map[string]interface{}
-	if err := c.Bind(&rawJSON); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse JSON: %v", err))
+	// Read request body
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to read request body: %v", err))
 	}
 
-	// Check if it's JSON-LD by looking for @context or @type
-	if _, hasContext := rawJSON["@context"]; hasContext {
-		return handleJSONLDAction(c, rawJSON)
+	// Parse as SemanticAction
+	action, err := semantic.ParseSemanticAction(body)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse action: %v", err))
 	}
 
-	if actionType, hasType := rawJSON["@type"]; hasType {
-		if typeStr, ok := actionType.(string); ok && isSemanticActionType(typeStr) {
-			return handleJSONLDAction(c, rawJSON)
-		}
+	// Route to appropriate handler based on @type
+	switch action.Type {
+	case "TransferAction":
+		return executeSemanticTransferAction(c, action)
+	case "CreateAction":
+		return executeSemanticCreateAction(c, action)
+	case "DeleteAction":
+		return executeSemanticDeleteAction(c, action)
+	case "UpdateAction":
+		return executeSemanticUpdateAction(c, action)
+	case "UploadAction":
+		return executeSemanticUploadAction(c, action)
+	case "ItemList":
+		return executeSemanticItemList(c, action)
+	case "ScheduledAction":
+		return handleScheduledAction(c, action)
+	default:
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Unsupported action type: %s", action.Type))
 	}
-
-	// Fallback to legacy format
-	return echo.NewHTTPError(http.StatusBadRequest, "Request must be Schema.org JSON-LD with @type field")
 }
 
 // handleSemanticActionMultipart handles multipart/form-data requests with file uploads
@@ -66,21 +79,10 @@ func handleSemanticActionMultipart(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse multipart request: %v", err))
 	}
 
-	// Convert the parsed action to map for routing
-	actionJSON, err := json.Marshal(semanticReq.Action)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to marshal action: %v", err))
-	}
-
-	var actionMap map[string]interface{}
-	if err := json.Unmarshal(actionJSON, &actionMap); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to unmarshal action: %v", err))
-	}
-
-	// Get action type
-	actionType, ok := actionMap["@type"].(string)
+	// Convert the action interface{} to *SemanticAction
+	action, ok := semanticReq.Action.(*semantic.SemanticAction)
 	if !ok {
-		return echo.NewHTTPError(http.StatusBadRequest, "Missing or invalid @type in action")
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid action type in multipart request")
 	}
 
 	// Convert EVE multipart files to the format expected by processTask
@@ -90,34 +92,30 @@ func handleSemanticActionMultipart(c echo.Context) error {
 	}
 
 	// Route based on action type and execute with files
-	switch actionType {
+	switch action.Type {
 	case "CreateAction":
-		return executeSemanticCreateActionWithFiles(c, actionJSON, files)
+		return executeSemanticCreateActionWithFiles(c, action, files)
 
 	case "UploadAction":
-		return executeSemanticUploadActionWithFiles(c, actionJSON, files)
+		return executeSemanticUploadActionWithFiles(c, action, files)
 
 	default:
 		// For other action types, execute without files
-		return handleJSONLDAction(c, actionMap)
+		return executeSemanticActionByType(c, action)
 	}
 }
 
 // executeSemanticCreateActionWithFiles handles CreateAction with file uploads
-func executeSemanticCreateActionWithFiles(c echo.Context, actionJSON []byte, files map[string][]*multipart.FileHeader) error {
-	var action semantic.CreateAction
-	if err := json.Unmarshal(actionJSON, &action); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse CreateAction: %v", err))
-	}
-
-	repo, err := extractRepository(action.Result)
+func executeSemanticCreateActionWithFiles(c echo.Context, action *semantic.SemanticAction, files map[string][]*multipart.FileHeader) error {
+	// Extract repository from result using helper
+	repo, err := semantic.GetGraphDBRepositoryFromAction(action, "result")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid result: %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid result", err)
 	}
 
 	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(repo)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid credentials: %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid credentials", err)
 	}
 	tgtURL = normalizeURL(tgtURL)
 
@@ -142,58 +140,53 @@ func executeSemanticCreateActionWithFiles(c echo.Context, actionJSON []byte, fil
 	// Execute the task with files
 	result, err := processTask(task, taskFiles, 0)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Creation failed: %v", err))
+		return semantic.ReturnActionError(c, action, "Creation failed", err)
 	}
 
-	// Return semantic response
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"@context":     "https://schema.org",
-		"@type":        "CreateAction",
-		"identifier":   action.Identifier,
-		"actionStatus": "CompletedActionStatus",
-		"result":       result,
-	})
+	// Set result and success status
+	action.Properties["result"] = result
+	semantic.SetSuccessOnAction(action)
+	return c.JSON(http.StatusOK, action)
 }
 
 // executeSemanticUploadActionWithFiles handles UploadAction with file uploads
-func executeSemanticUploadActionWithFiles(c echo.Context, actionJSON []byte, files map[string][]*multipart.FileHeader) error {
-	var action semantic.UploadAction
-	if err := json.Unmarshal(actionJSON, &action); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse UploadAction: %v", err))
-	}
-
-	targetRepo, err := extractRepository(action.Target)
+func executeSemanticUploadActionWithFiles(c echo.Context, action *semantic.SemanticAction, files map[string][]*multipart.FileHeader) error {
+	// Try to extract target repository using helper
+	targetRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "target")
 	if err != nil {
-		if catalog, ok := action.Target.(*semantic.DataCatalog); ok {
-			props := catalog.Properties
-			if props == nil {
-				return echo.NewHTTPError(http.StatusBadRequest, "Missing credentials in target")
-			}
+		// Try extracting from DataCatalog
+		catalog, catalogErr := semantic.GetDataCatalogFromAction(action, "target")
+		if catalogErr != nil {
+			return semantic.ReturnActionError(c, action, "Invalid target", err)
+		}
 
-			username, _ := props["username"].(string)
-			password, _ := props["password"].(string)
-			serverURL, _ := props["serverUrl"].(string)
+		props := catalog.Properties
+		if props == nil {
+			return semantic.ReturnActionError(c, action, "Missing credentials in target", nil)
+		}
 
-			targetRepo = &semantic.GraphDBRepository{
-				Identifier: catalog.Identifier,
-				Properties: map[string]interface{}{
-					"serverUrl": serverURL,
-					"username":  username,
-					"password":  password,
-				},
-			}
-		} else {
-			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid target: %v", err))
+		username, _ := props["username"].(string)
+		password, _ := props["password"].(string)
+		serverURL, _ := props["serverUrl"].(string)
+
+		targetRepo = &semantic.GraphDBRepository{
+			Identifier: catalog.Identifier,
+			Properties: map[string]interface{}{
+				"serverUrl": serverURL,
+				"username":  username,
+				"password":  password,
+			},
 		}
 	}
 
 	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(targetRepo)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid target credentials: %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid target credentials", err)
 	}
 	tgtURL = normalizeURL(tgtURL)
 
-	graph, graphErr := extractGraph(action.Object)
+	// Check if it's a graph import or repository import
+	graph, graphErr := semantic.GetGraphDBGraphFromAction(action, "object")
 	if graphErr == nil {
 		graphURI := semantic.ExtractGraphIdentifier(graph)
 
@@ -217,16 +210,12 @@ func executeSemanticUploadActionWithFiles(c echo.Context, actionJSON []byte, fil
 
 		result, err := processTask(task, taskFiles, 0)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Graph import failed: %v", err))
+			return semantic.ReturnActionError(c, action, "Graph import failed", err)
 		}
 
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"@context":     "https://schema.org",
-			"@type":        "UploadAction",
-			"identifier":   action.Identifier,
-			"actionStatus": "CompletedActionStatus",
-			"result":       result,
-		})
+		action.Properties["result"] = result
+		semantic.SetSuccessOnAction(action)
+		return c.JSON(http.StatusOK, action)
 	}
 
 	// Repository import (BRF file)
@@ -249,115 +238,74 @@ func executeSemanticUploadActionWithFiles(c echo.Context, actionJSON []byte, fil
 
 	result, err := processTask(task, taskFiles, 0)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Repository import failed: %v", err))
+		return semantic.ReturnActionError(c, action, "Repository import failed", err)
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"@context":     "https://schema.org",
-		"@type":        "UploadAction",
-		"identifier":   action.Identifier,
-		"actionStatus": "CompletedActionStatus",
-		"result":       result,
-	})
+	action.Properties["result"] = result
+	semantic.SetSuccessOnAction(action)
+	return c.JSON(http.StatusOK, action)
 }
 
-// isSemanticActionType checks if a type string is a semantic action
-func isSemanticActionType(t string) bool {
-	switch t {
-	case "TransferAction", "CreateAction", "DeleteAction", "UpdateAction", "UploadAction", "ItemList", "ScheduledAction":
-		return true
-	default:
-		return false
-	}
-}
-
-// handleJSONLDAction processes a JSON-LD action
-func handleJSONLDAction(c echo.Context, data map[string]interface{}) error {
-	// Get @type to determine action kind
-	actionType, ok := data["@type"].(string)
-	if !ok {
-		return echo.NewHTTPError(http.StatusBadRequest, "Missing or invalid @type in JSON-LD")
-	}
-
-	// Re-marshal to bytes for parsing
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to marshal JSON-LD: %v", err))
-	}
-
-	// Route based on action type
-	switch actionType {
+// executeSemanticActionByType routes a SemanticAction to the appropriate handler
+func executeSemanticActionByType(c echo.Context, action *semantic.SemanticAction) error {
+	switch action.Type {
 	case "TransferAction":
-		return executeSemanticTransferAction(c, jsonData)
-
+		return executeSemanticTransferAction(c, action)
 	case "CreateAction":
-		return executeSemanticCreateAction(c, jsonData)
-
+		return executeSemanticCreateAction(c, action)
 	case "DeleteAction":
-		return executeSemanticDeleteAction(c, jsonData)
-
+		return executeSemanticDeleteAction(c, action)
 	case "UpdateAction":
-		return executeSemanticUpdateAction(c, jsonData)
-
+		return executeSemanticUpdateAction(c, action)
 	case "UploadAction":
-		return executeSemanticUploadAction(c, jsonData)
-
+		return executeSemanticUploadAction(c, action)
 	case "ItemList":
-		return executeSemanticItemList(c, jsonData)
-
+		return executeSemanticItemList(c, action)
 	case "ScheduledAction":
-		// ScheduledAction wraps another action - extract the inner action
-		return handleScheduledAction(c, jsonData)
-
+		return handleScheduledAction(c, action)
 	default:
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Unsupported action type: %s", actionType))
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Unsupported action type: %s", action.Type))
 	}
 }
 
 // executeSemanticTransferAction handles TransferAction (repo-migration, graph-migration)
-func executeSemanticTransferAction(c echo.Context, jsonData []byte) error {
-	var action semantic.TransferAction
-	if err := json.Unmarshal(jsonData, &action); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse TransferAction: %v", err))
-	}
-
-	// Determine if it's repo migration or graph migration
-	// Check if fromLocation/toLocation are repositories or if object is a graph
-	if action.Object != nil {
+func executeSemanticTransferAction(c echo.Context, action *semantic.SemanticAction) error {
+	// Determine if it's repo migration or graph migration by checking for object property
+	if _, hasObject := action.Properties["object"]; hasObject {
 		// Graph migration: transfer specific graph
-		return executeGraphMigration(c, &action)
+		return executeGraphMigration(c, action)
 	}
 
 	// Repository migration: transfer entire repository
-	return executeRepositoryMigration(c, &action)
+	return executeRepositoryMigration(c, action)
 }
 
 // executeRepositoryMigration performs a full repository migration
-func executeRepositoryMigration(c echo.Context, action *semantic.TransferAction) error {
-	// Extract source repository
-	srcRepo, err := extractRepository(action.FromLocation)
+func executeRepositoryMigration(c echo.Context, action *semantic.SemanticAction) error {
+	// Extract source repository using helper
+	srcRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "fromLocation")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid fromLocation: %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid fromLocation", err)
 	}
 
-	// Extract target repository
-	tgtRepo, err := extractRepository(action.ToLocation)
+	// Extract target repository using helper
+	tgtRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "toLocation")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid toLocation: %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid toLocation", err)
 	}
 
 	// Get credentials
 	srcURL, srcUser, srcPass, srcRepoName, err := semantic.ExtractRepositoryCredentials(srcRepo)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid source credentials: %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid source credentials", err)
 	}
-	srcURL = normalizeURL(srcURL) // Remove trailing slash
+	srcURL = normalizeURL(srcURL)
 
 	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(tgtRepo)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid target credentials: %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid target credentials", err)
 	}
-	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+	tgtURL = normalizeURL(tgtURL)
 
 	// Create legacy Task for execution
 	task := Task{
@@ -379,51 +327,47 @@ func executeRepositoryMigration(c echo.Context, action *semantic.TransferAction)
 	// Execute the task
 	result, err := processTask(task, nil, 0)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Migration failed: %v", err))
+		return semantic.ReturnActionError(c, action, "Migration failed", err)
 	}
 
-	// Return semantic response
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"@context":     "https://schema.org",
-		"@type":        "TransferAction",
-		"identifier":   action.Identifier,
-		"actionStatus": "CompletedActionStatus",
-		"result":       result,
-	})
+	// Set result and success status
+	action.Properties["result"] = result
+	semantic.SetSuccessOnAction(action)
+	return c.JSON(http.StatusOK, action)
 }
 
 // executeGraphMigration performs a graph migration
-func executeGraphMigration(c echo.Context, action *semantic.TransferAction) error {
-	// Extract source repository
-	srcRepo, err := extractRepository(action.FromLocation)
+func executeGraphMigration(c echo.Context, action *semantic.SemanticAction) error {
+	// Extract source repository using helper
+	srcRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "fromLocation")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid fromLocation: %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid fromLocation", err)
 	}
 
-	// Extract target repository
-	tgtRepo, err := extractRepository(action.ToLocation)
+	// Extract target repository using helper
+	tgtRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "toLocation")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid toLocation: %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid toLocation", err)
 	}
 
-	// Extract graph
-	graph, err := extractGraph(action.Object)
+	// Extract graph using helper
+	graph, err := semantic.GetGraphDBGraphFromAction(action, "object")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid object (graph): %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid object (graph)", err)
 	}
 
 	// Get credentials
 	srcURL, srcUser, srcPass, srcRepoName, err := semantic.ExtractRepositoryCredentials(srcRepo)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid source credentials: %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid source credentials", err)
 	}
-	srcURL = normalizeURL(srcURL) // Remove trailing slash
+	srcURL = normalizeURL(srcURL)
 
 	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(tgtRepo)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid target credentials: %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid target credentials", err)
 	}
-	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+	tgtURL = normalizeURL(tgtURL)
 
 	graphURI := semantic.ExtractGraphIdentifier(graph)
 
@@ -449,37 +393,28 @@ func executeGraphMigration(c echo.Context, action *semantic.TransferAction) erro
 	// Execute the task
 	result, err := processTask(task, nil, 0)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Graph migration failed: %v", err))
+		return semantic.ReturnActionError(c, action, "Graph migration failed", err)
 	}
 
-	// Return semantic response
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"@context":     "https://schema.org",
-		"@type":        "TransferAction",
-		"identifier":   action.Identifier,
-		"actionStatus": "CompletedActionStatus",
-		"result":       result,
-	})
+	// Set result and success status
+	action.Properties["result"] = result
+	semantic.SetSuccessOnAction(action)
+	return c.JSON(http.StatusOK, action)
 }
 
 // executeSemanticCreateAction handles CreateAction (repo-create)
-func executeSemanticCreateAction(c echo.Context, jsonData []byte) error {
-	var action semantic.CreateAction
-	if err := json.Unmarshal(jsonData, &action); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse CreateAction: %v", err))
-	}
-
-	// Extract repository from result
-	repo, err := extractRepository(action.Result)
+func executeSemanticCreateAction(c echo.Context, action *semantic.SemanticAction) error {
+	// Extract repository from result using helper
+	repo, err := semantic.GetGraphDBRepositoryFromAction(action, "result")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid result: %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid result", err)
 	}
 
 	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(repo)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid credentials: %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid credentials", err)
 	}
-	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+	tgtURL = normalizeURL(tgtURL)
 
 	// Create legacy Task for execution
 	task := Task{
@@ -495,35 +430,26 @@ func executeSemanticCreateAction(c echo.Context, jsonData []byte) error {
 	// Execute the task (will handle config file from multipart if present)
 	result, err := processTask(task, nil, 0)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Creation failed: %v", err))
+		return semantic.ReturnActionError(c, action, "Creation failed", err)
 	}
 
-	// Return semantic response
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"@context":     "https://schema.org",
-		"@type":        "CreateAction",
-		"identifier":   action.Identifier,
-		"actionStatus": "CompletedActionStatus",
-		"result":       result,
-	})
+	// Set result and success status
+	action.Properties["result"] = result
+	semantic.SetSuccessOnAction(action)
+	return c.JSON(http.StatusOK, action)
 }
 
 // executeSemanticDeleteAction handles DeleteAction (repo-delete, graph-delete)
-func executeSemanticDeleteAction(c echo.Context, jsonData []byte) error {
-	var action semantic.DeleteAction
-	if err := json.Unmarshal(jsonData, &action); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse DeleteAction: %v", err))
-	}
-
-	// Try to parse as repository first
-	repo, repoErr := extractRepository(action.Object)
+func executeSemanticDeleteAction(c echo.Context, action *semantic.SemanticAction) error {
+	// Try to parse as repository first using helper
+	repo, repoErr := semantic.GetGraphDBRepositoryFromAction(action, "object")
 	if repoErr == nil {
 		// Repository deletion
 		tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(repo)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid credentials: %v", err))
+			return semantic.ReturnActionError(c, action, "Invalid credentials", err)
 		}
-	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+		tgtURL = normalizeURL(tgtURL)
 
 		task := Task{
 			Action: "repo-delete",
@@ -537,24 +463,20 @@ func executeSemanticDeleteAction(c echo.Context, jsonData []byte) error {
 
 		result, err := processTask(task, nil, 0)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Deletion failed: %v", err))
+			return semantic.ReturnActionError(c, action, "Deletion failed", err)
 		}
 
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"@context":     "https://schema.org",
-			"@type":        "DeleteAction",
-			"identifier":   action.Identifier,
-			"actionStatus": "CompletedActionStatus",
-			"result":       result,
-		})
+		action.Properties["result"] = result
+		semantic.SetSuccessOnAction(action)
+		return c.JSON(http.StatusOK, action)
 	}
 
-	// Try to parse as graph
-	graph, graphErr := extractGraph(action.Object)
+	// Try to parse as graph using helper
+	graph, graphErr := semantic.GetGraphDBGraphFromAction(action, "object")
 	if graphErr == nil {
 		// Graph deletion - need repository info from IncludedInDataCatalog
 		if graph.IncludedInDataCatalog == nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "Graph must include includedInDataCatalog")
+			return semantic.ReturnActionError(c, action, "Graph must include includedInDataCatalog", nil)
 		}
 
 		graphURI := semantic.ExtractGraphIdentifier(graph)
@@ -564,7 +486,7 @@ func executeSemanticDeleteAction(c echo.Context, jsonData []byte) error {
 		// Extract credentials from properties
 		props := graph.IncludedInDataCatalog.Properties
 		if props == nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "Missing credentials in includedInDataCatalog")
+			return semantic.ReturnActionError(c, action, "Missing credentials in includedInDataCatalog", nil)
 		}
 
 		username, _ := props["username"].(string)
@@ -583,36 +505,30 @@ func executeSemanticDeleteAction(c echo.Context, jsonData []byte) error {
 
 		result, err := processTask(task, nil, 0)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Graph deletion failed: %v", err))
+			return semantic.ReturnActionError(c, action, "Graph deletion failed", err)
 		}
 
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"@context":     "https://schema.org",
-			"@type":        "DeleteAction",
-			"identifier":   action.Identifier,
-			"actionStatus": "CompletedActionStatus",
-			"result":       result,
-		})
+		action.Properties["result"] = result
+		semantic.SetSuccessOnAction(action)
+		return c.JSON(http.StatusOK, action)
 	}
 
-	return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid object: must be repository or graph. Repo error: %v, Graph error: %v", repoErr, graphErr))
+	return semantic.ReturnActionError(c, action, fmt.Sprintf("Invalid object: must be repository or graph. Repo error: %v, Graph error: %v", repoErr, graphErr), nil)
 }
 
 // executeSemanticUpdateAction handles UpdateAction (repo-rename, graph-rename)
-func executeSemanticUpdateAction(c echo.Context, jsonData []byte) error {
-	var action semantic.UpdateAction
-	if err := json.Unmarshal(jsonData, &action); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse UpdateAction: %v", err))
-	}
+func executeSemanticUpdateAction(c echo.Context, action *semantic.SemanticAction) error {
+	// Get target name using helper
+	targetName := semantic.GetTargetNameFromAction(action)
 
-	// Try to parse as repository rename
-	repo, repoErr := extractRepository(action.Object)
+	// Try to parse as repository rename using helper
+	repo, repoErr := semantic.GetGraphDBRepositoryFromAction(action, "object")
 	if repoErr == nil {
 		tgtURL, tgtUser, tgtPass, oldRepoName, err := semantic.ExtractRepositoryCredentials(repo)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid credentials: %v", err))
+			return semantic.ReturnActionError(c, action, "Invalid credentials", err)
 		}
-	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+		tgtURL = normalizeURL(tgtURL)
 
 		task := Task{
 			Action: "repo-rename",
@@ -621,29 +537,25 @@ func executeSemanticUpdateAction(c echo.Context, jsonData []byte) error {
 				Username: tgtUser,
 				Password: tgtPass,
 				RepoOld:  oldRepoName,
-				RepoNew:  action.TargetName,
+				RepoNew:  targetName,
 			},
 		}
 
 		result, err := processTask(task, nil, 0)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Rename failed: %v", err))
+			return semantic.ReturnActionError(c, action, "Rename failed", err)
 		}
 
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"@context":     "https://schema.org",
-			"@type":        "UpdateAction",
-			"identifier":   action.Identifier,
-			"actionStatus": "CompletedActionStatus",
-			"result":       result,
-		})
+		action.Properties["result"] = result
+		semantic.SetSuccessOnAction(action)
+		return c.JSON(http.StatusOK, action)
 	}
 
-	// Try to parse as graph rename
-	graph, graphErr := extractGraph(action.Object)
+	// Try to parse as graph rename using helper
+	graph, graphErr := semantic.GetGraphDBGraphFromAction(action, "object")
 	if graphErr == nil {
 		if graph.IncludedInDataCatalog == nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "Graph must include includedInDataCatalog")
+			return semantic.ReturnActionError(c, action, "Graph must include includedInDataCatalog", nil)
 		}
 
 		oldGraphURI := semantic.ExtractGraphIdentifier(graph)
@@ -652,7 +564,7 @@ func executeSemanticUpdateAction(c echo.Context, jsonData []byte) error {
 
 		props := graph.IncludedInDataCatalog.Properties
 		if props == nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "Missing credentials in includedInDataCatalog")
+			return semantic.ReturnActionError(c, action, "Missing credentials in includedInDataCatalog", nil)
 		}
 
 		username, _ := props["username"].(string)
@@ -666,69 +578,61 @@ func executeSemanticUpdateAction(c echo.Context, jsonData []byte) error {
 				Password: password,
 				Repo:     repoName,
 				GraphOld: oldGraphURI,
-				GraphNew: action.TargetName,
+				GraphNew: targetName,
 			},
 		}
 
 		result, err := processTask(task, nil, 0)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Graph rename failed: %v", err))
+			return semantic.ReturnActionError(c, action, "Graph rename failed", err)
 		}
 
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"@context":     "https://schema.org",
-			"@type":        "UpdateAction",
-			"identifier":   action.Identifier,
-			"actionStatus": "CompletedActionStatus",
-			"result":       result,
-		})
+		action.Properties["result"] = result
+		semantic.SetSuccessOnAction(action)
+		return c.JSON(http.StatusOK, action)
 	}
 
-	return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid object: must be repository or graph. Repo error: %v, Graph error: %v", repoErr, graphErr))
+	return semantic.ReturnActionError(c, action, fmt.Sprintf("Invalid object: must be repository or graph. Repo error: %v, Graph error: %v", repoErr, graphErr), nil)
 }
 
 // executeSemanticUploadAction handles UploadAction (graph-import, repo-import)
-func executeSemanticUploadAction(c echo.Context, jsonData []byte) error {
-	var action semantic.UploadAction
-	if err := json.Unmarshal(jsonData, &action); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse UploadAction: %v", err))
-	}
-
-	// Extract target repository
-	targetRepo, err := extractRepository(action.Target)
+func executeSemanticUploadAction(c echo.Context, action *semantic.SemanticAction) error {
+	// Extract target repository using helper
+	targetRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "target")
 	if err != nil {
-		// Try extracting from DataCatalog
-		if catalog, ok := action.Target.(*semantic.DataCatalog); ok {
-			props := catalog.Properties
-			if props == nil {
-				return echo.NewHTTPError(http.StatusBadRequest, "Missing credentials in target")
-			}
+		// Try extracting from DataCatalog using helper
+		catalog, catalogErr := semantic.GetDataCatalogFromAction(action, "target")
+		if catalogErr != nil {
+			return semantic.ReturnActionError(c, action, "Invalid target", err)
+		}
 
-			username, _ := props["username"].(string)
-			password, _ := props["password"].(string)
-			serverURL, _ := props["serverUrl"].(string)
+		props := catalog.Properties
+		if props == nil {
+			return semantic.ReturnActionError(c, action, "Missing credentials in target", nil)
+		}
 
-			targetRepo = &semantic.GraphDBRepository{
-				Identifier: catalog.Identifier,
-				Properties: map[string]interface{}{
-					"serverUrl": serverURL,
-					"username":  username,
-					"password":  password,
-				},
-			}
-		} else {
-			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid target: %v", err))
+		username, _ := props["username"].(string)
+		password, _ := props["password"].(string)
+		serverURL, _ := props["serverUrl"].(string)
+
+		targetRepo = &semantic.GraphDBRepository{
+			Identifier: catalog.Identifier,
+			Properties: map[string]interface{}{
+				"serverUrl": serverURL,
+				"username":  username,
+				"password":  password,
+			},
 		}
 	}
 
 	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(targetRepo)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid target credentials: %v", err))
+		return semantic.ReturnActionError(c, action, "Invalid target credentials", err)
 	}
-	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+	tgtURL = normalizeURL(tgtURL)
 
-	// Check if it's graph import or repo import
-	graph, graphErr := extractGraph(action.Object)
+	// Check if it's graph import or repo import using helper
+	graph, graphErr := semantic.GetGraphDBGraphFromAction(action, "object")
 	if graphErr == nil {
 		// Graph import
 		graphURI := semantic.ExtractGraphIdentifier(graph)
@@ -746,16 +650,12 @@ func executeSemanticUploadAction(c echo.Context, jsonData []byte) error {
 
 		result, err := processTask(task, nil, 0)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Graph import failed: %v", err))
+			return semantic.ReturnActionError(c, action, "Graph import failed", err)
 		}
 
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"@context":     "https://schema.org",
-			"@type":        "UploadAction",
-			"identifier":   action.Identifier,
-			"actionStatus": "CompletedActionStatus",
-			"result":       result,
-		})
+		action.Properties["result"] = result
+		semantic.SetSuccessOnAction(action)
+		return c.JSON(http.StatusOK, action)
 	}
 
 	// Repository import (BRF file)
@@ -771,16 +671,12 @@ func executeSemanticUploadAction(c echo.Context, jsonData []byte) error {
 
 	result, err := processTask(task, nil, 0)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Repository import failed: %v", err))
+		return semantic.ReturnActionError(c, action, "Repository import failed", err)
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"@context":     "https://schema.org",
-		"@type":        "UploadAction",
-		"identifier":   action.Identifier,
-		"actionStatus": "CompletedActionStatus",
-		"result":       result,
-	})
+	action.Properties["result"] = result
+	semantic.SetSuccessOnAction(action)
+	return c.JSON(http.StatusOK, action)
 }
 
 // ItemListWorkflow represents a Schema.org ItemList for workflow execution
@@ -803,13 +699,19 @@ type ListItemNode struct {
 }
 
 // executeSemanticItemList handles ItemList (workflow with multiple actions)
-func executeSemanticItemList(c echo.Context, jsonData []byte) error {
+func executeSemanticItemList(c echo.Context, action *semantic.SemanticAction) error {
 	debugLog("executeSemanticItemList called")
 
+	// Convert action to ItemListWorkflow
+	actionJSON, err := json.Marshal(action)
+	if err != nil {
+		return semantic.ReturnActionError(c, action, "Failed to marshal action", err)
+	}
+
 	var workflow ItemListWorkflow
-	if err := json.Unmarshal(jsonData, &workflow); err != nil {
+	if err := json.Unmarshal(actionJSON, &workflow); err != nil {
 		debugLog("Failed to unmarshal ItemList: %v\n", err)
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse ItemList: %v", err))
+		return semantic.ReturnActionError(c, action, "Failed to parse ItemList", err)
 	}
 
 	debugLog("Parsed ItemList: %s with %d items\n", workflow.Identifier, len(workflow.ItemListElement))
@@ -1041,36 +943,35 @@ func executeWorkflowItem(c echo.Context, listItem ListItemNode, index int) (map[
 
 // executeActionDirect executes an action directly and returns the result
 func executeActionDirect(c echo.Context, actionType string, jsonData []byte) (map[string]interface{}, error) {
+	// Parse as SemanticAction
+	action, err := semantic.ParseSemanticAction(jsonData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse action: %w", err)
+	}
+
 	switch actionType {
 	case "TransferAction":
-		return executeTransferActionDirect(jsonData)
+		return executeTransferActionDirect(action)
 	case "DeleteAction":
-		return executeDeleteActionDirect(jsonData)
+		return executeDeleteActionDirect(action)
 	case "CreateAction":
-		return executeCreateActionDirect(jsonData)
+		return executeCreateActionDirect(action)
 	case "UpdateAction":
-		return executeUpdateActionDirect(jsonData)
+		return executeUpdateActionDirect(action)
 	case "UploadAction":
-		return executeUploadActionDirect(jsonData)
+		return executeUploadActionDirect(action)
 	default:
 		return nil, fmt.Errorf("unsupported action type: %s", actionType)
 	}
 }
 
 // executeDeleteActionDirect executes a DeleteAction and returns the result directly
-func executeDeleteActionDirect(jsonData []byte) (map[string]interface{}, error) {
+func executeDeleteActionDirect(action *semantic.SemanticAction) (map[string]interface{}, error) {
 	debugLog("executeDeleteActionDirect called")
-
-	var action semantic.DeleteAction
-	if err := json.Unmarshal(jsonData, &action); err != nil {
-		debugLog("Failed to unmarshal DeleteAction: %v\n", err)
-		return nil, fmt.Errorf("failed to parse DeleteAction: %w", err)
-	}
-
 	debugLog("DeleteAction identifier: %s\n", action.Identifier)
 
-	// Try to parse as repository first
-	repo, repoErr := extractRepository(action.Object)
+	// Try to parse as repository first using helper
+	repo, repoErr := semantic.GetGraphDBRepositoryFromAction(action, "object")
 	if repoErr == nil {
 		// Repository deletion
 		debugLog("Detected repository deletion")
@@ -1079,7 +980,7 @@ func executeDeleteActionDirect(jsonData []byte) (map[string]interface{}, error) 
 			debugLog("Failed to extract credentials: %v\n", err)
 			return nil, fmt.Errorf("invalid credentials: %w", err)
 		}
-		tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+		tgtURL = normalizeURL(tgtURL)
 
 		debugLog("Deleting repository: %s at %s\n", tgtRepoName, tgtURL)
 
@@ -1102,17 +1003,18 @@ func executeDeleteActionDirect(jsonData []byte) (map[string]interface{}, error) 
 
 		debugLog("Repository deletion successful: %v\n", result)
 
-		return map[string]interface{}{
-			"@context":     "https://schema.org",
-			"@type":        "DeleteAction",
-			"identifier":   action.Identifier,
-			"actionStatus": "CompletedActionStatus",
-			"result":       result,
-		}, nil
+		// Return as map for workflow compatibility
+		action.Properties["result"] = result
+		semantic.SetSuccessOnAction(action)
+
+		actionMap := make(map[string]interface{})
+		actionJSON, _ := json.Marshal(action)
+		_ = json.Unmarshal(actionJSON, &actionMap)
+		return actionMap, nil
 	}
 
-	// Try to parse as graph
-	graph, graphErr := extractGraph(action.Object)
+	// Try to parse as graph using helper
+	graph, graphErr := semantic.GetGraphDBGraphFromAction(action, "object")
 	if graphErr == nil {
 		// Graph deletion
 		if graph.IncludedInDataCatalog == nil {
@@ -1147,38 +1049,34 @@ func executeDeleteActionDirect(jsonData []byte) (map[string]interface{}, error) 
 			return nil, fmt.Errorf("graph deletion failed: %w", err)
 		}
 
-		return map[string]interface{}{
-			"@context":     "https://schema.org",
-			"@type":        "DeleteAction",
-			"identifier":   action.Identifier,
-			"actionStatus": "CompletedActionStatus",
-			"result":       result,
-		}, nil
+		// Return as map for workflow compatibility
+		action.Properties["result"] = result
+		semantic.SetSuccessOnAction(action)
+
+		actionMap := make(map[string]interface{})
+		actionJSON, _ := json.Marshal(action)
+		_ = json.Unmarshal(actionJSON, &actionMap)
+		return actionMap, nil
 	}
 
 	return nil, fmt.Errorf("invalid object: must be repository or graph")
 }
 
 // executeTransferActionDirect executes a TransferAction and returns the result directly
-func executeTransferActionDirect(jsonData []byte) (map[string]interface{}, error) {
-	var action semantic.TransferAction
-	if err := json.Unmarshal(jsonData, &action); err != nil {
-		return nil, fmt.Errorf("failed to parse TransferAction: %w", err)
-	}
-
-	if action.Object != nil {
+func executeTransferActionDirect(action *semantic.SemanticAction) (map[string]interface{}, error) {
+	if _, hasObject := action.Properties["object"]; hasObject {
 		// Graph migration
-		srcRepo, err := extractRepository(action.FromLocation)
+		srcRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "fromLocation")
 		if err != nil {
 			return nil, fmt.Errorf("invalid fromLocation: %w", err)
 		}
 
-		tgtRepo, err := extractRepository(action.ToLocation)
+		tgtRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "toLocation")
 		if err != nil {
 			return nil, fmt.Errorf("invalid toLocation: %w", err)
 		}
 
-		graph, err := extractGraph(action.Object)
+		graph, err := semantic.GetGraphDBGraphFromAction(action, "object")
 		if err != nil {
 			return nil, fmt.Errorf("invalid object (graph): %w", err)
 		}
@@ -1187,13 +1085,13 @@ func executeTransferActionDirect(jsonData []byte) (map[string]interface{}, error
 		if err != nil {
 			return nil, fmt.Errorf("invalid source credentials: %w", err)
 		}
-	srcURL = normalizeURL(srcURL) // Remove trailing slash
+		srcURL = normalizeURL(srcURL)
 
 		tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(tgtRepo)
 		if err != nil {
 			return nil, fmt.Errorf("invalid target credentials: %w", err)
 		}
-	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+		tgtURL = normalizeURL(tgtURL)
 
 		graphURI := semantic.ExtractGraphIdentifier(graph)
 
@@ -1220,22 +1118,22 @@ func executeTransferActionDirect(jsonData []byte) (map[string]interface{}, error
 			return nil, fmt.Errorf("graph migration failed: %w", err)
 		}
 
-		return map[string]interface{}{
-			"@context":     "https://schema.org",
-			"@type":        "TransferAction",
-			"identifier":   action.Identifier,
-			"actionStatus": "CompletedActionStatus",
-			"result":       result,
-		}, nil
+		action.Properties["result"] = result
+		semantic.SetSuccessOnAction(action)
+
+		actionMap := make(map[string]interface{})
+		actionJSON, _ := json.Marshal(action)
+		_ = json.Unmarshal(actionJSON, &actionMap)
+		return actionMap, nil
 	}
 
 	// Repository migration
-	srcRepo, err := extractRepository(action.FromLocation)
+	srcRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "fromLocation")
 	if err != nil {
 		return nil, fmt.Errorf("invalid fromLocation: %w", err)
 	}
 
-	tgtRepo, err := extractRepository(action.ToLocation)
+	tgtRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "toLocation")
 	if err != nil {
 		return nil, fmt.Errorf("invalid toLocation: %w", err)
 	}
@@ -1244,13 +1142,13 @@ func executeTransferActionDirect(jsonData []byte) (map[string]interface{}, error
 	if err != nil {
 		return nil, fmt.Errorf("invalid source credentials: %w", err)
 	}
-	srcURL = normalizeURL(srcURL) // Remove trailing slash
+	srcURL = normalizeURL(srcURL)
 
 	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(tgtRepo)
 	if err != nil {
 		return nil, fmt.Errorf("invalid target credentials: %w", err)
 	}
-	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+	tgtURL = normalizeURL(tgtURL)
 
 	task := Task{
 		Action: "repo-migration",
@@ -1273,23 +1171,18 @@ func executeTransferActionDirect(jsonData []byte) (map[string]interface{}, error
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
 
-	return map[string]interface{}{
-		"@context":     "https://schema.org",
-		"@type":        "TransferAction",
-		"identifier":   action.Identifier,
-		"actionStatus": "CompletedActionStatus",
-		"result":       result,
-	}, nil
+	action.Properties["result"] = result
+	semantic.SetSuccessOnAction(action)
+
+	actionMap := make(map[string]interface{})
+	actionJSON, _ := json.Marshal(action)
+	_ = json.Unmarshal(actionJSON, &actionMap)
+	return actionMap, nil
 }
 
 // executeCreateActionDirect executes a CreateAction and returns the result directly
-func executeCreateActionDirect(jsonData []byte) (map[string]interface{}, error) {
-	var action semantic.CreateAction
-	if err := json.Unmarshal(jsonData, &action); err != nil {
-		return nil, fmt.Errorf("failed to parse CreateAction: %w", err)
-	}
-
-	repo, err := extractRepository(action.Result)
+func executeCreateActionDirect(action *semantic.SemanticAction) (map[string]interface{}, error) {
+	repo, err := semantic.GetGraphDBRepositoryFromAction(action, "result")
 	if err != nil {
 		return nil, fmt.Errorf("invalid result: %w", err)
 	}
@@ -1298,7 +1191,7 @@ func executeCreateActionDirect(jsonData []byte) (map[string]interface{}, error) 
 	if err != nil {
 		return nil, fmt.Errorf("invalid credentials: %w", err)
 	}
-	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+	tgtURL = normalizeURL(tgtURL)
 
 	task := Task{
 		Action: "repo-create",
@@ -1315,29 +1208,26 @@ func executeCreateActionDirect(jsonData []byte) (map[string]interface{}, error) 
 		return nil, fmt.Errorf("creation failed: %w", err)
 	}
 
-	return map[string]interface{}{
-		"@context":     "https://schema.org",
-		"@type":        "CreateAction",
-		"identifier":   action.Identifier,
-		"actionStatus": "CompletedActionStatus",
-		"result":       result,
-	}, nil
+	action.Properties["result"] = result
+	semantic.SetSuccessOnAction(action)
+
+	actionMap := make(map[string]interface{})
+	actionJSON, _ := json.Marshal(action)
+	_ = json.Unmarshal(actionJSON, &actionMap)
+	return actionMap, nil
 }
 
 // executeUpdateActionDirect executes an UpdateAction and returns the result directly
-func executeUpdateActionDirect(jsonData []byte) (map[string]interface{}, error) {
-	var action semantic.UpdateAction
-	if err := json.Unmarshal(jsonData, &action); err != nil {
-		return nil, fmt.Errorf("failed to parse UpdateAction: %w", err)
-	}
+func executeUpdateActionDirect(action *semantic.SemanticAction) (map[string]interface{}, error) {
+	targetName := semantic.GetTargetNameFromAction(action)
 
-	repo, repoErr := extractRepository(action.Object)
+	repo, repoErr := semantic.GetGraphDBRepositoryFromAction(action, "object")
 	if repoErr == nil {
 		tgtURL, tgtUser, tgtPass, oldRepoName, err := semantic.ExtractRepositoryCredentials(repo)
 		if err != nil {
 			return nil, fmt.Errorf("invalid credentials: %w", err)
 		}
-	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+		tgtURL = normalizeURL(tgtURL)
 
 		task := Task{
 			Action: "repo-rename",
@@ -1346,7 +1236,7 @@ func executeUpdateActionDirect(jsonData []byte) (map[string]interface{}, error) 
 				Username: tgtUser,
 				Password: tgtPass,
 				RepoOld:  oldRepoName,
-				RepoNew:  action.TargetName,
+				RepoNew:  targetName,
 			},
 		}
 
@@ -1355,16 +1245,16 @@ func executeUpdateActionDirect(jsonData []byte) (map[string]interface{}, error) 
 			return nil, fmt.Errorf("rename failed: %w", err)
 		}
 
-		return map[string]interface{}{
-			"@context":     "https://schema.org",
-			"@type":        "UpdateAction",
-			"identifier":   action.Identifier,
-			"actionStatus": "CompletedActionStatus",
-			"result":       result,
-		}, nil
+		action.Properties["result"] = result
+		semantic.SetSuccessOnAction(action)
+
+		actionMap := make(map[string]interface{})
+		actionJSON, _ := json.Marshal(action)
+		_ = json.Unmarshal(actionJSON, &actionMap)
+		return actionMap, nil
 	}
 
-	graph, graphErr := extractGraph(action.Object)
+	graph, graphErr := semantic.GetGraphDBGraphFromAction(action, "object")
 	if graphErr == nil {
 		if graph.IncludedInDataCatalog == nil {
 			return nil, fmt.Errorf("graph must include includedInDataCatalog")
@@ -1390,7 +1280,7 @@ func executeUpdateActionDirect(jsonData []byte) (map[string]interface{}, error) 
 				Password: password,
 				Repo:     repoName,
 				GraphOld: oldGraphURI,
-				GraphNew: action.TargetName,
+				GraphNew: targetName,
 			},
 		}
 
@@ -1399,47 +1289,43 @@ func executeUpdateActionDirect(jsonData []byte) (map[string]interface{}, error) 
 			return nil, fmt.Errorf("graph rename failed: %w", err)
 		}
 
-		return map[string]interface{}{
-			"@context":     "https://schema.org",
-			"@type":        "UpdateAction",
-			"identifier":   action.Identifier,
-			"actionStatus": "CompletedActionStatus",
-			"result":       result,
-		}, nil
+		action.Properties["result"] = result
+		semantic.SetSuccessOnAction(action)
+
+		actionMap := make(map[string]interface{})
+		actionJSON, _ := json.Marshal(action)
+		_ = json.Unmarshal(actionJSON, &actionMap)
+		return actionMap, nil
 	}
 
 	return nil, fmt.Errorf("invalid object: must be repository or graph")
 }
 
 // executeUploadActionDirect executes an UploadAction and returns the result directly
-func executeUploadActionDirect(jsonData []byte) (map[string]interface{}, error) {
-	var action semantic.UploadAction
-	if err := json.Unmarshal(jsonData, &action); err != nil {
-		return nil, fmt.Errorf("failed to parse UploadAction: %w", err)
-	}
-
-	targetRepo, err := extractRepository(action.Target)
+func executeUploadActionDirect(action *semantic.SemanticAction) (map[string]interface{}, error) {
+	targetRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "target")
 	if err != nil {
-		if catalog, ok := action.Target.(*semantic.DataCatalog); ok {
-			props := catalog.Properties
-			if props == nil {
-				return nil, fmt.Errorf("missing credentials in target")
-			}
-
-			username, _ := props["username"].(string)
-			password, _ := props["password"].(string)
-			serverURL, _ := props["serverUrl"].(string)
-
-			targetRepo = &semantic.GraphDBRepository{
-				Identifier: catalog.Identifier,
-				Properties: map[string]interface{}{
-					"serverUrl": serverURL,
-					"username":  username,
-					"password":  password,
-				},
-			}
-		} else {
+		catalog, catalogErr := semantic.GetDataCatalogFromAction(action, "target")
+		if catalogErr != nil {
 			return nil, fmt.Errorf("invalid target: %w", err)
+		}
+
+		props := catalog.Properties
+		if props == nil {
+			return nil, fmt.Errorf("missing credentials in target")
+		}
+
+		username, _ := props["username"].(string)
+		password, _ := props["password"].(string)
+		serverURL, _ := props["serverUrl"].(string)
+
+		targetRepo = &semantic.GraphDBRepository{
+			Identifier: catalog.Identifier,
+			Properties: map[string]interface{}{
+				"serverUrl": serverURL,
+				"username":  username,
+				"password":  password,
+			},
 		}
 	}
 
@@ -1447,9 +1333,9 @@ func executeUploadActionDirect(jsonData []byte) (map[string]interface{}, error) 
 	if err != nil {
 		return nil, fmt.Errorf("invalid target credentials: %w", err)
 	}
-	tgtURL = normalizeURL(tgtURL) // Remove trailing slash
+	tgtURL = normalizeURL(tgtURL)
 
-	graph, graphErr := extractGraph(action.Object)
+	graph, graphErr := semantic.GetGraphDBGraphFromAction(action, "object")
 	if graphErr == nil {
 		graphURI := semantic.ExtractGraphIdentifier(graph)
 
@@ -1469,13 +1355,13 @@ func executeUploadActionDirect(jsonData []byte) (map[string]interface{}, error) 
 			return nil, fmt.Errorf("graph import failed: %w", err)
 		}
 
-		return map[string]interface{}{
-			"@context":     "https://schema.org",
-			"@type":        "UploadAction",
-			"identifier":   action.Identifier,
-			"actionStatus": "CompletedActionStatus",
-			"result":       result,
-		}, nil
+		action.Properties["result"] = result
+		semantic.SetSuccessOnAction(action)
+
+		actionMap := make(map[string]interface{})
+		actionJSON, _ := json.Marshal(action)
+		_ = json.Unmarshal(actionJSON, &actionMap)
+		return actionMap, nil
 	}
 
 	task := Task{
@@ -1493,78 +1379,42 @@ func executeUploadActionDirect(jsonData []byte) (map[string]interface{}, error) 
 		return nil, fmt.Errorf("repository import failed: %w", err)
 	}
 
-	return map[string]interface{}{
-		"@context":     "https://schema.org",
-		"@type":        "UploadAction",
-		"identifier":   action.Identifier,
-		"actionStatus": "CompletedActionStatus",
-		"result":       result,
-	}, nil
+	action.Properties["result"] = result
+	semantic.SetSuccessOnAction(action)
+
+	actionMap := make(map[string]interface{})
+	actionJSON, _ := json.Marshal(action)
+	_ = json.Unmarshal(actionJSON, &actionMap)
+	return actionMap, nil
 }
 
 // handleScheduledAction extracts the inner action from a ScheduledAction wrapper
-func handleScheduledAction(c echo.Context, jsonData []byte) error {
-	var scheduled semantic.SemanticScheduledAction
-	if err := json.Unmarshal(jsonData, &scheduled); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse ScheduledAction: %v", err))
-	}
-
+func handleScheduledAction(c echo.Context, action *semantic.SemanticAction) error {
 	// Extract the actual action from additionalProperty
-	if scheduled.Properties == nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "ScheduledAction missing additionalProperty")
+	if action.Properties == nil {
+		return semantic.ReturnActionError(c, action, "ScheduledAction missing additionalProperty", nil)
 	}
 
 	// The HTTP body should be in additionalProperty.body
-	body, ok := scheduled.Properties["body"]
+	body, ok := action.Properties["body"]
 	if !ok {
-		return echo.NewHTTPError(http.StatusBadRequest, "ScheduledAction missing body in additionalProperty")
+		return semantic.ReturnActionError(c, action, "ScheduledAction missing body in additionalProperty", nil)
 	}
 
-	// Re-marshal and handle the inner action
+	// Re-marshal and parse as SemanticAction
 	bodyJSON, err := json.Marshal(body)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to marshal body: %v", err))
+		return semantic.ReturnActionError(c, action, "Failed to marshal body", err)
 	}
 
-	var innerAction map[string]interface{}
-	if err := json.Unmarshal(bodyJSON, &innerAction); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse inner action: %v", err))
+	innerAction, err := semantic.ParseSemanticAction(bodyJSON)
+	if err != nil {
+		return semantic.ReturnActionError(c, action, "Failed to parse inner action", err)
 	}
 
-	return handleJSONLDAction(c, innerAction)
+	return executeSemanticActionByType(c, innerAction)
 }
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-// extractRepository extracts a GraphDBRepository from an interface{}
-func extractRepository(v interface{}) (*semantic.GraphDBRepository, error) {
-	// Re-marshal and unmarshal to get the correct type
-	data, err := json.Marshal(v)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal: %w", err)
-	}
-
-	var repo semantic.GraphDBRepository
-	if err := json.Unmarshal(data, &repo); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal as repository: %w", err)
-	}
-
-	return &repo, nil
-}
-
-// extractGraph extracts a GraphDBGraph from an interface{}
-func extractGraph(v interface{}) (*semantic.GraphDBGraph, error) {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal: %w", err)
-	}
-
-	var graph semantic.GraphDBGraph
-	if err := json.Unmarshal(data, &graph); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal as graph: %w", err)
-	}
-
-	return &graph, nil
-}

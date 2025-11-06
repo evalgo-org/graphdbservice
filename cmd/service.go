@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"eve.evalgo.org/common"
-	"eve.evalgo.org/config"
 	evehttp "eve.evalgo.org/http"
 	"eve.evalgo.org/registry"
 	"github.com/spf13/cobra"
@@ -51,17 +50,16 @@ func init() {
 }
 
 func runSemanticService(cmd *cobra.Command, args []string) {
-	// Load configuration using EVE config utilities
-	env := config.NewEnvConfig("GRAPHDB")
+	// Load configuration from environment
 	serverConfig := evehttp.DefaultServerConfig()
-	serverConfig.Port = env.GetInt("SERVICE_PORT", 8080)
-	serverConfig.Debug = env.GetBool("DEBUG", false)
+	serverConfig.Port = common.GetEnvInt("GRAPHDB_SERVICE_PORT", 8080)
+	serverConfig.Debug = common.GetEnvBool("GRAPHDB_DEBUG", false)
 	serverConfig.BodyLimit = "100M"
 
 	// Service configuration
-	serviceURL := env.GetString("SERVICE_URL", "")
-	registryURL := env.GetString("REGISTRY_URL", "http://localhost:8096")
-	apiKey := env.GetString("API_KEY", "")
+	serviceURL := common.GetEnv("GRAPHDB_SERVICE_URL", "")
+	registryURL := common.GetEnv("GRAPHDB_REGISTRY_URL", "http://localhost:8096")
+	apiKey := common.GetEnv("GRAPHDB_API_KEY", "")
 
 	// Override from flags if provided
 	if flagPort, _ := cmd.Flags().GetInt("port"); flagPort != 0 {
