@@ -799,14 +799,14 @@ func executeSemanticItemList(c echo.Context, action *semantic.SemanticAction) er
 
 	// Build response
 	response := map[string]interface{}{
-		"@context":       "https://schema.org",
-		"@type":          "ItemList",
-		"identifier":     workflow.Identifier,
-		"actionStatus":   "CompletedActionStatus",
-		"totalItems":     len(workflow.ItemListElement),
+		"@context":        "https://schema.org",
+		"@type":           "ItemList",
+		"identifier":      workflow.Identifier,
+		"actionStatus":    "CompletedActionStatus",
+		"totalItems":      len(workflow.ItemListElement),
 		"successfulItems": len(results) - len(errors),
-		"failedItems":    len(errors),
-		"results":        results,
+		"failedItems":     len(errors),
+		"results":         results,
 	}
 
 	if len(errors) > 0 {
