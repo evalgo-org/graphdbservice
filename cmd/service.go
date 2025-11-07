@@ -10,9 +10,13 @@ import (
 
 	"eve.evalgo.org/common"
 	evehttp "eve.evalgo.org/http"
+	"eve.evalgo.org/pkg/statemanager"
 	"eve.evalgo.org/registry"
 	"github.com/spf13/cobra"
 )
+
+// Global state manager
+var stateManager *statemanager.Manager
 
 var serviceCmd = &cobra.Command{
 	Use:   "service",
@@ -107,11 +111,21 @@ func runSemanticService(cmd *cobra.Command, args []string) {
 		"api_key_set":  apiKey != "",
 	}).Info("Configuration loaded")
 
+	// Initialize state manager
+	stateManager = statemanager.New(statemanager.Config{
+		ServiceName:   "pxgraphservice",
+		MaxOperations: 100,
+	})
+
 	// Create Echo server with EVE http utilities
 	e := evehttp.NewEchoServer(serverConfig)
 
 	// Add security headers middleware
 	e.Use(evehttp.SecurityHeadersMiddleware())
+
+	// Register state endpoints
+	apiGroup := e.Group("/v1/api")
+	stateManager.RegisterRoutes(apiGroup)
 
 	// API key middleware (if configured)
 	if apiKey != "" {
@@ -123,7 +137,34 @@ func runSemanticService(cmd *cobra.Command, args []string) {
 	}
 
 	// Health check endpoint using EVE utilities (always public)
-	e.GET("/health", evehttp.HealthCheckHandler("graphdb-semantic", "2.0.0"))
+	e.GET("/health", evehttp.HealthCheckHandler("graphdb-semantic", "v1"))
+
+	// Documentation endpoint
+	e.GET("/v1/api/docs", evehttp.DocumentationHandler(evehttp.ServiceDocConfig{
+		ServiceID:   "graphdb-semantic",
+		ServiceName: "GraphDB Semantic Service",
+		Description: "GraphDB repository and graph management via semantic actions",
+		Version:     "v1",
+		Port:        serverConfig.Port,
+		Capabilities: []string{
+			"graphdb-migration", "graphdb-create", "graphdb-delete",
+			"graphdb-rename", "graphdb-import", "graphdb-export",
+			"graph-migration", "graph-import", "graph-export",
+			"graph-delete", "graph-rename", "state-tracking",
+		},
+		Endpoints: []evehttp.EndpointDoc{
+			{
+				Method:      "POST",
+				Path:        "/v1/api/semantic/action",
+				Description: "Execute semantic actions for GraphDB operations",
+			},
+			{
+				Method:      "GET",
+				Path:        "/health",
+				Description: "Health check endpoint",
+			},
+		},
+	}))
 
 	// Start server in goroutine
 	go func() {
@@ -162,18 +203,19 @@ func runSemanticService(cmd *cobra.Command, args []string) {
 		ServiceID:   fmt.Sprintf("graphdb-service-%s", hostname),
 		ServiceName: fmt.Sprintf("GraphDB Service - %s", hostname),
 		ServiceURL:  serviceURL,
-		Version:     "2.0.0",
+		Version:     "v1",
 		Hostname:    hostname,
 		ServiceType: "graphdb",
 		Capabilities: []string{
 			"graphdb-migration", "graphdb-create", "graphdb-delete",
 			"graphdb-rename", "graphdb-import", "graphdb-export",
 			"graph-migration", "graph-import", "graph-export",
-			"graph-delete", "graph-rename",
+			"graph-delete", "graph-rename", "state-tracking",
 		},
 		Properties: map[string]interface{}{
 			"semanticEndpoint": fmt.Sprintf("%s/v1/api/semantic/action", serviceURL),
 			"healthEndpoint":   fmt.Sprintf("%s/health", serviceURL),
+			"documentation":    fmt.Sprintf("%s/v1/api/docs", serviceURL),
 		},
 	})
 

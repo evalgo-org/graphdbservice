@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"eve.evalgo.org/semantic"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -282,30 +283,47 @@ func executeSemanticTransferAction(c echo.Context, action *semantic.SemanticActi
 
 // executeRepositoryMigration performs a full repository migration
 func executeRepositoryMigration(c echo.Context, action *semantic.SemanticAction) error {
+	// Track operation
+	opID := uuid.New().String()
+	stateManager.StartOperation(opID, "repo-migration", map[string]interface{}{
+		"action": "repo-migration",
+	})
+	defer func() {
+		stateManager.CompleteOperation(opID, nil)
+	}()
+
 	// Extract source repository using helper
 	srcRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "fromLocation")
 	if err != nil {
+		stateManager.CompleteOperation(opID, err)
 		return semantic.ReturnActionError(c, action, "Invalid fromLocation", err)
 	}
 
 	// Extract target repository using helper
 	tgtRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "toLocation")
 	if err != nil {
+		stateManager.CompleteOperation(opID, err)
 		return semantic.ReturnActionError(c, action, "Invalid toLocation", err)
 	}
 
 	// Get credentials
 	srcURL, srcUser, srcPass, srcRepoName, err := semantic.ExtractRepositoryCredentials(srcRepo)
 	if err != nil {
+		stateManager.CompleteOperation(opID, err)
 		return semantic.ReturnActionError(c, action, "Invalid source credentials", err)
 	}
 	srcURL = normalizeURL(srcURL)
 
 	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(tgtRepo)
 	if err != nil {
+		stateManager.CompleteOperation(opID, err)
 		return semantic.ReturnActionError(c, action, "Invalid target credentials", err)
 	}
 	tgtURL = normalizeURL(tgtURL)
+
+	// Update metadata with repository info
+	stateManager.UpdateMetadata(opID, "source_repo", srcRepoName)
+	stateManager.UpdateMetadata(opID, "target_repo", tgtRepoName)
 
 	// Create legacy Task for execution
 	task := Task{
@@ -327,6 +345,7 @@ func executeRepositoryMigration(c echo.Context, action *semantic.SemanticAction)
 	// Execute the task
 	result, err := processTask(task, nil, 0)
 	if err != nil {
+		stateManager.CompleteOperation(opID, err)
 		return semantic.ReturnActionError(c, action, "Migration failed", err)
 	}
 
@@ -338,38 +357,57 @@ func executeRepositoryMigration(c echo.Context, action *semantic.SemanticAction)
 
 // executeGraphMigration performs a graph migration
 func executeGraphMigration(c echo.Context, action *semantic.SemanticAction) error {
+	// Track operation
+	opID := uuid.New().String()
+	stateManager.StartOperation(opID, "graph-migration", map[string]interface{}{
+		"action": "graph-migration",
+	})
+	defer func() {
+		stateManager.CompleteOperation(opID, nil)
+	}()
+
 	// Extract source repository using helper
 	srcRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "fromLocation")
 	if err != nil {
+		stateManager.CompleteOperation(opID, err)
 		return semantic.ReturnActionError(c, action, "Invalid fromLocation", err)
 	}
 
 	// Extract target repository using helper
 	tgtRepo, err := semantic.GetGraphDBRepositoryFromAction(action, "toLocation")
 	if err != nil {
+		stateManager.CompleteOperation(opID, err)
 		return semantic.ReturnActionError(c, action, "Invalid toLocation", err)
 	}
 
 	// Extract graph using helper
 	graph, err := semantic.GetGraphDBGraphFromAction(action, "object")
 	if err != nil {
+		stateManager.CompleteOperation(opID, err)
 		return semantic.ReturnActionError(c, action, "Invalid object (graph)", err)
 	}
 
 	// Get credentials
 	srcURL, srcUser, srcPass, srcRepoName, err := semantic.ExtractRepositoryCredentials(srcRepo)
 	if err != nil {
+		stateManager.CompleteOperation(opID, err)
 		return semantic.ReturnActionError(c, action, "Invalid source credentials", err)
 	}
 	srcURL = normalizeURL(srcURL)
 
 	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(tgtRepo)
 	if err != nil {
+		stateManager.CompleteOperation(opID, err)
 		return semantic.ReturnActionError(c, action, "Invalid target credentials", err)
 	}
 	tgtURL = normalizeURL(tgtURL)
 
 	graphURI := semantic.ExtractGraphIdentifier(graph)
+
+	// Update metadata with graph info
+	stateManager.UpdateMetadata(opID, "graph_uri", graphURI)
+	stateManager.UpdateMetadata(opID, "source_repo", srcRepoName)
+	stateManager.UpdateMetadata(opID, "target_repo", tgtRepoName)
 
 	// Create legacy Task for execution
 	task := Task{
@@ -393,6 +431,7 @@ func executeGraphMigration(c echo.Context, action *semantic.SemanticAction) erro
 	// Execute the task
 	result, err := processTask(task, nil, 0)
 	if err != nil {
+		stateManager.CompleteOperation(opID, err)
 		return semantic.ReturnActionError(c, action, "Graph migration failed", err)
 	}
 
@@ -404,17 +443,31 @@ func executeGraphMigration(c echo.Context, action *semantic.SemanticAction) erro
 
 // executeSemanticCreateAction handles CreateAction (repo-create)
 func executeSemanticCreateAction(c echo.Context, action *semantic.SemanticAction) error {
+	// Track operation
+	opID := uuid.New().String()
+	stateManager.StartOperation(opID, "repo-create", map[string]interface{}{
+		"action": "repo-create",
+	})
+	defer func() {
+		stateManager.CompleteOperation(opID, nil)
+	}()
+
 	// Extract repository from result using helper
 	repo, err := semantic.GetGraphDBRepositoryFromAction(action, "result")
 	if err != nil {
+		stateManager.CompleteOperation(opID, err)
 		return semantic.ReturnActionError(c, action, "Invalid result", err)
 	}
 
 	tgtURL, tgtUser, tgtPass, tgtRepoName, err := semantic.ExtractRepositoryCredentials(repo)
 	if err != nil {
+		stateManager.CompleteOperation(opID, err)
 		return semantic.ReturnActionError(c, action, "Invalid credentials", err)
 	}
 	tgtURL = normalizeURL(tgtURL)
+
+	// Update metadata
+	stateManager.UpdateMetadata(opID, "repo_name", tgtRepoName)
 
 	// Create legacy Task for execution
 	task := Task{
@@ -430,6 +483,7 @@ func executeSemanticCreateAction(c echo.Context, action *semantic.SemanticAction
 	// Execute the task (will handle config file from multipart if present)
 	result, err := processTask(task, nil, 0)
 	if err != nil {
+		stateManager.CompleteOperation(opID, err)
 		return semantic.ReturnActionError(c, action, "Creation failed", err)
 	}
 
