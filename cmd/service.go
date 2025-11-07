@@ -12,6 +12,7 @@ import (
 	evehttp "eve.evalgo.org/http"
 	"eve.evalgo.org/pkg/statemanager"
 	"eve.evalgo.org/registry"
+	"github.com/labstack/echo/v4"
 	"github.com/spf13/cobra"
 )
 
@@ -127,13 +128,22 @@ func runSemanticService(cmd *cobra.Command, args []string) {
 	apiGroup := e.Group("/v1/api")
 	stateManager.RegisterRoutes(apiGroup)
 
-	// API key middleware (if configured)
+	// API key middleware
+	var apiKeyMiddleware echo.MiddlewareFunc
 	if apiKey != "" {
-		// Semantic action endpoint with API key protection
-		e.POST("/v1/api/semantic/action", handleSemanticAction, evehttp.APIKeyMiddleware(apiKey))
+		apiKeyMiddleware = evehttp.APIKeyMiddleware(apiKey)
+		// Semantic action endpoint with API key protection (primary interface)
+		apiGroup.POST("/semantic/action", handleSemanticAction, apiKeyMiddleware)
 	} else {
-		// Semantic action endpoint without protection
-		e.POST("/v1/api/semantic/action", handleSemanticAction)
+		// Semantic action endpoint without protection (primary interface)
+		apiGroup.POST("/semantic/action", handleSemanticAction)
+	}
+
+	// REST endpoints (convenience adapters that convert to semantic actions)
+	if apiKey != "" {
+		registerRESTEndpoints(apiGroup, apiKeyMiddleware)
+	} else {
+		registerRESTEndpoints(apiGroup, nil)
 	}
 
 	// Health check endpoint using EVE utilities (always public)
@@ -156,7 +166,32 @@ func runSemanticService(cmd *cobra.Command, args []string) {
 			{
 				Method:      "POST",
 				Path:        "/v1/api/semantic/action",
-				Description: "Execute semantic actions for GraphDB operations",
+				Description: "Execute semantic actions for GraphDB operations (primary interface)",
+			},
+			{
+				Method:      "POST",
+				Path:        "/v1/api/queries",
+				Description: "Execute graph query (REST convenience - converts to SearchAction)",
+			},
+			{
+				Method:      "POST",
+				Path:        "/v1/api/nodes",
+				Description: "Create node (REST convenience - converts to CreateAction)",
+			},
+			{
+				Method:      "PUT",
+				Path:        "/v1/api/nodes/:id",
+				Description: "Update node (REST convenience - converts to UpdateAction)",
+			},
+			{
+				Method:      "DELETE",
+				Path:        "/v1/api/nodes/:id",
+				Description: "Delete node (REST convenience - converts to DeleteAction)",
+			},
+			{
+				Method:      "POST",
+				Path:        "/v1/api/relationships",
+				Description: "Create relationship (REST convenience - converts to CreateAction)",
 			},
 			{
 				Method:      "GET",
