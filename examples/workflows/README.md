@@ -1,13 +1,13 @@
 # GraphDB Semantic Workflow Examples
 
-This directory contains example workflows for orchestrating GraphDB operations using **When** (semantic task orchestrator) and **pxgraphservice** (GraphDB migration service).
+This directory contains example workflows for orchestrating GraphDB operations using **When** (semantic task orchestrator) and **graphdbservice** (GraphDB migration service).
 
 ## Architecture
 
 ```
 When Orchestrator (Scheduler)
     ↓ (HTTP POST with JSON-LD)
-pxgraphservice (/v1/api/semantic/action)
+graphdbservice (/v1/api/semantic/action)
     ↓ (Parse Schema.org actions)
 GraphDB Operations (Migrations, Backups, etc.)
 ```
@@ -146,7 +146,7 @@ Before running these workflows, set up your credentials:
 
 ```bash
 # GraphDB API Key
-export GRAPHDB_API_KEY="your-pxgraphservice-api-key"
+export GRAPHDB_API_KEY="your-graphdbservice-api-key"
 
 # Production GraphDB credentials
 export PROD_PASSWORD="prod-admin-password"
@@ -188,7 +188,7 @@ When to execute the action:
 
 ## Direct Testing (Without When)
 
-You can test pxgraphservice semantic API directly:
+You can test graphdbservice semantic API directly:
 
 ```bash
 # Test repository migration
@@ -280,7 +280,7 @@ curl -X POST http://localhost:8080/v1/api/semantic/action \
 
 View migration logs and status:
 
-**pxgraphservice UI**: http://localhost:8080/admin/migrations
+**graphdbservice UI**: http://localhost:8080/admin/migrations
 **When UI**: http://localhost:3000/
 
 ## Advanced Examples
@@ -321,7 +321,7 @@ View migration logs and status:
 **Issue**: Workflow not executing
 - Check When UI for task status
 - Verify API key in environment variables
-- Check pxgraphservice logs
+- Check graphdbservice logs
 
 **Issue**: Migration fails
 - Check GraphDB connectivity
@@ -338,4 +338,4 @@ View migration logs and status:
 - [Schema.org Actions](https://schema.org/Action)
 - [ISO 8601 Durations](https://en.wikipedia.org/wiki/ISO_8601#Durations)
 - [When Documentation](http://localhost:3000/examples)
-- [pxgraphservice API](http://localhost:8080/docs)
+- [graphdbservice API](http://localhost:8080/docs)

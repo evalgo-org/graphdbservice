@@ -1,6 +1,6 @@
 # Pxgraphservice Completion Status
 
-**Service:** pxgraphservice
+**Service:** graphdbservice
 **Version:** v1
 **Date:** 2025-11-08
 **Status:** ✅ Production Ready

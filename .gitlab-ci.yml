@@ -1,4 +1,4 @@
-# GitLab CI/CD Pipeline for GraphDB Service (pxgraphservice)
+# GitLab CI/CD Pipeline for GraphDB Service (graphdbservice)
 #
 # This pipeline automates testing, building, and deployment of the GraphDB Service.
 # It uses the taskfile.yml for task automation and ensures code quality standards.

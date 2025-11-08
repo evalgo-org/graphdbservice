@@ -1,4 +1,4 @@
-# GraphDB Service (pxgraphservice)
+# GraphDB Service (graphdbservice)
 
 A comprehensive RESTful API service for managing GraphDB repositories and RDF graphs. This service provides high-level operations for repository migration, graph management, data import/export, and various administrative tasks across GraphDB instances.
 
@@ -62,7 +62,7 @@ The service is built using:
 ### Component Structure
 
 ```
-pxgraphservice/
+graphdbservice/
 ├── main.go                  # Application entry point
 ├── cmd/                     # Command-line interface & handlers
 │   ├── root.go             # Root command and configuration
@@ -106,8 +106,8 @@ pxgraphservice/
 
 ```bash
 # Clone the repository
-git clone https://gitlab.com/your-org/pxgraphservice.git
-cd pxgraphservice
+git clone https://gitlab.com/your-org/graphdbservice.git
+cd graphdbservice
 
 # Download dependencies
 go mod download
@@ -123,13 +123,13 @@ go install
 
 ```bash
 # Using nixpacks
-nixpacks build . --name pxgraphservice:latest
+nixpacks build . --name graphdbservice:latest
 
 # Run the container
 docker run -d \
   -p 8080:8080 \
   -e API_KEY=your-secret-key \
-  pxgraphservice:latest
+  graphdbservice:latest
 ```
 
 ## Configuration

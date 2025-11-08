@@ -115,7 +115,7 @@ func runSemanticService(cmd *cobra.Command, args []string) {
 
 	// Initialize state manager
 	stateManager = statemanager.New(statemanager.Config{
-		ServiceName:   "pxgraphservice",
+		ServiceName:   "graphdbservice",
 		MaxOperations: 100,
 	})
 
@@ -127,7 +127,7 @@ func runSemanticService(cmd *cobra.Command, args []string) {
 
 	// Initialize tracing (gracefully disabled if unavailable)
 	if tracer := tracing.Init(tracing.InitConfig{
-		ServiceID:        "pxgraphservice",
+		ServiceID:        "graphdbservice",
 		DisableIfMissing: true,
 	}); tracer != nil {
 		e.Use(tracer.Middleware())

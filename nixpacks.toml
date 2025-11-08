@@ -8,11 +8,11 @@ cmds = ["go mod download"]
 
 [phases.build]
 cmds = [
-    "CGO_ENABLED=0 go build -ldflags '-w -s' -o pxgraphservice ./cmd"
+    "CGO_ENABLED=0 go build -ldflags '-w -s' -o graphdbservice ./cmd"
 ]
 
 [start]
-cmd = "./pxgraphservice"
+cmd = "./graphdbservice"
 
 [variables]
 GO111MODULE = "on"
