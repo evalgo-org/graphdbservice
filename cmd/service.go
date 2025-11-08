@@ -10,7 +10,7 @@ import (
 
 	"eve.evalgo.org/common"
 	evehttp "eve.evalgo.org/http"
-	"eve.evalgo.org/pkg/statemanager"
+	"eve.evalgo.org/statemanager"
 	"eve.evalgo.org/registry"
 	"github.com/labstack/echo/v4"
 	"github.com/spf13/cobra"
