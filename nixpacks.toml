@@ -8,13 +8,12 @@ cmds = ["go mod download"]
 
 [phases.build]
 cmds = [
-    "CGO_ENABLED=0 go build -ldflags '-w -s' -o graphdbservice ./cmd"
+    "CGO_ENABLED=0 go build -ldflags '-w -s' -o graphdbservice ."
 ]
 
 [start]
-cmd = "./graphdbservice"
+cmd = "./graphdbservice service"
 
 [variables]
 GO111MODULE = "on"
 CGO_ENABLED = "0"
-PORT = "8080"
