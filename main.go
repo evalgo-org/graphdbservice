@@ -27,7 +27,7 @@
 //	graphservice graphdb --identity /path/to/ziti/identity.json
 package main
 
-import "evalgo.org/graphservice/cmd"
+import cmd "evalgo.org/graphservice/cmd/graphdbservice"
 
 // main is the application entry point that delegates to the cobra command structure.
 func main() {
