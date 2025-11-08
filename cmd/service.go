@@ -12,6 +12,7 @@ import (
 	evehttp "eve.evalgo.org/http"
 	"eve.evalgo.org/statemanager"
 	"eve.evalgo.org/registry"
+	"eve.evalgo.org/tracing"
 	"github.com/labstack/echo/v4"
 	"github.com/spf13/cobra"
 )
@@ -123,6 +124,14 @@ func runSemanticService(cmd *cobra.Command, args []string) {
 
 	// Add security headers middleware
 	e.Use(evehttp.SecurityHeadersMiddleware())
+
+	// Initialize tracing (gracefully disabled if unavailable)
+	if tracer := tracing.Init(tracing.InitConfig{
+		ServiceID:        "pxgraphservice",
+		DisableIfMissing: true,
+	}); tracer != nil {
+		e.Use(tracer.Middleware())
+	}
 
 	// Register state endpoints
 	apiGroup := e.Group("/v1/api")
