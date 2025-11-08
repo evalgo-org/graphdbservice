@@ -17,7 +17,6 @@ import (
 
 	"eve.evalgo.org/db"
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
 )
 
 var (
@@ -108,7 +107,7 @@ func (d *debugHTTPTransport) RoundTrip(req *http.Request) (*http.Response, error
 	// Read and log the response body only for errors if debug mode is enabled
 	if debugMode && resp.StatusCode >= 400 {
 		bodyBytes, readErr := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close() // Ignore error - body already read
 
 		if readErr != nil {
 			debugLogHTTP("Failed to read error response body: %v", readErr)
@@ -146,25 +145,6 @@ func enableHTTPDebugLogging(client *http.Client) *http.Client {
 func md5Hash(text string) string {
 	hash := md5.Sum([]byte(text))
 	return fmt.Sprintf("%x", hash)
-}
-
-// apiKeyMiddleware validates the API key in the request header.
-// It checks the "x-api-key" header against the API_KEY environment variable.
-func apiKeyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		apiKey := c.Request().Header.Get("x-api-key")
-		expectedKey := os.Getenv("API_KEY")
-
-		if apiKey == "" {
-			return echo.NewHTTPError(http.StatusUnauthorized, "Missing x-api-key header")
-		}
-
-		if apiKey != expectedKey {
-			return echo.NewHTTPError(http.StatusUnauthorized, "Invalid API key")
-		}
-
-		return next(c)
-	}
 }
 
 // getFileNames extracts the filenames from a slice of multipart file headers.
@@ -256,46 +236,6 @@ func getRepositoryNames(bindings []db.GraphDBBinding) []string {
 		}
 	}
 	return names
-}
-
-// validateTask validates that a task has all required fields for its action type.
-func validateTask(task Task) error {
-	validActions := map[string]bool{
-		"repo-migration":  true,
-		"graph-migration": true,
-		"repo-delete":     true,
-		"graph-delete":    true,
-		"repo-create":     true,
-		"graph-import":    true,
-		"repo-import":     true,
-		"repo-rename":     true,
-		"graph-rename":    true,
-	}
-
-	if !validActions[task.Action] {
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid action: %s", task.Action)
-	}
-
-	switch task.Action {
-	case "repo-migration", "graph-migration":
-		if task.Src == nil || task.Tgt == nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "Both src and tgt are required for %s", task.Action)
-		}
-	case "repo-delete", "graph-delete", "repo-create", "graph-import", "repo-import":
-		if task.Tgt == nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "tgt is required for %s", task.Action)
-		}
-	case "repo-rename":
-		if task.Tgt == nil || task.Tgt.RepoOld == "" || task.Tgt.RepoNew == "" {
-			return echo.NewHTTPError(http.StatusBadRequest, "tgt with repo_old and repo_new are required for rename-repo")
-		}
-	case "graph-rename":
-		if task.Tgt == nil || task.Tgt.GraphOld == "" || task.Tgt.GraphNew == "" {
-			return echo.NewHTTPError(http.StatusBadRequest, "tgt with graph_old and graph_new are required for rename-graph")
-		}
-	}
-
-	return nil
 }
 
 // URL2ServiceRobust parses a URL string and extracts the service portion (host:port).

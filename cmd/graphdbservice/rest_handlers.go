@@ -81,7 +81,7 @@ func createNodeREST(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("Invalid request: %v", err)})
 	}
 
-	if req.Labels == nil || len(req.Labels) == 0 {
+	if len(req.Labels) == 0 {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "labels is required"})
 	}
 
