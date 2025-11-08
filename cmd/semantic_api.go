@@ -50,25 +50,9 @@ func handleSemanticAction(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to parse action: %v", err))
 	}
 
-	// Route to appropriate handler based on @type
-	switch action.Type {
-	case "TransferAction":
-		return executeSemanticTransferAction(c, action)
-	case "CreateAction":
-		return executeSemanticCreateAction(c, action)
-	case "DeleteAction":
-		return executeSemanticDeleteAction(c, action)
-	case "UpdateAction":
-		return executeSemanticUpdateAction(c, action)
-	case "UploadAction":
-		return executeSemanticUploadAction(c, action)
-	case "ItemList":
-		return executeSemanticItemList(c, action)
-	case "ScheduledAction":
-		return handleScheduledAction(c, action)
-	default:
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Unsupported action type: %s", action.Type))
-	}
+	// Dispatch to registered handler using the ActionRegistry
+	// No switch statement needed - handlers are registered at startup
+	return semantic.Handle(c, action)
 }
 
 // handleSemanticActionMultipart handles multipart/form-data requests with file uploads

@@ -10,6 +10,7 @@ import (
 
 	"eve.evalgo.org/common"
 	evehttp "eve.evalgo.org/http"
+	"eve.evalgo.org/semantic"
 	"eve.evalgo.org/statemanager"
 	"eve.evalgo.org/registry"
 	"eve.evalgo.org/tracing"
@@ -112,6 +113,16 @@ func runSemanticService(cmd *cobra.Command, args []string) {
 		"debug":        serverConfig.Debug,
 		"api_key_set":  apiKey != "",
 	}).Info("Configuration loaded")
+
+	// Register action handlers with the semantic action registry
+	// This allows the service to handle semantic actions without modifying switch statements
+	semantic.MustRegister("TransferAction", executeSemanticTransferAction)
+	semantic.MustRegister("CreateAction", executeSemanticCreateAction)
+	semantic.MustRegister("DeleteAction", executeSemanticDeleteAction)
+	semantic.MustRegister("UpdateAction", executeSemanticUpdateAction)
+	semantic.MustRegister("UploadAction", executeSemanticUploadAction)
+	semantic.MustRegister("ItemList", executeSemanticItemList)
+	semantic.MustRegister("ScheduledAction", handleScheduledAction)
 
 	// Initialize state manager
 	stateManager = statemanager.New(statemanager.Config{

@@ -3,7 +3,7 @@ module evalgo.org/graphservice
 go 1.25.1
 
 require (
-	eve.evalgo.org v0.0.31
+	eve.evalgo.org v0.0.32
 	github.com/google/uuid v1.6.0
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/spf13/cobra v1.10.1
