@@ -11,7 +11,7 @@ dist
 *.tar
 *.rdf
 /btp.user.json
-graphdbservice
+/graphdbservice
 
 # Temporary files
 tmp/
