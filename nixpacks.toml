@@ -15,7 +15,7 @@ cmds = [
   # CGO_ENABLED=0: Create static binary (no C dependencies)
   # -ldflags '-w -s': Strip debug info and symbol table (smaller binary)
   # -trimpath: Remove file system paths from binary (reproducible builds)
-  "CGO_ENABLED=0 go build -ldflags '-w -s' -trimpath -o graphdbservice ./cmd/graphdbservice",
+  "CGO_ENABLED=0 go build -ldflags '-w -s' -trimpath -o graphdbservice .",
   # Ensure binary has execute permissions
   "chmod +x graphdbservice"
 ]
