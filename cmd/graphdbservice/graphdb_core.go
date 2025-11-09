@@ -847,9 +847,7 @@ func processTask(task Task, files map[string][]*multipart.FileHeader, taskIndex 
 
 		// Try to list graphs (this might fail if repository doesn't exist)
 		debugLog("Listing graphs in repository: %s", task.Tgt.Repo)
-		fmt.Println("232", "fooooo", task.Tgt)
 		graphsResponse, err := db.GraphDBListGraphs(task.Tgt.URL, task.Tgt.Username, task.Tgt.Password, task.Tgt.Repo)
-		fmt.Println("233", err)
 		if err != nil {
 			fmt.Printf("WARNING: Failed to list graphs (repository might not exist): %v\n", err)
 			// Continue with import - we'll try to import anyway
