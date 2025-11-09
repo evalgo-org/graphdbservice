@@ -21,4 +21,4 @@ cmds = [
 ]
 
 [start]
-cmd = "./graphdbservice"
+cmd = "./graphdbservice service"
